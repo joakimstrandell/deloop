@@ -1,0 +1,23 @@
+/*
+  Sample app global styles.
+
+  In a real Deloop user project, this file would be the CSS entry point
+  configured in .deloop/config.ts. Deloop would inject a <link> to this
+  file into the canvas iframe so components render with their real styles.
+
+  For this initial bootstrap, components use inline styles, so this file
+  is a placeholder for that future wiring.
+*/
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-size: 14px;
+  color: #111827;
+  background: #fff;
+}

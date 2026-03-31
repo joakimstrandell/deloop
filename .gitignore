@@ -1,0 +1,19 @@
+node_modules/
+dist/
+.cache/
+
+# Deloop project state — gitignored by default (see ADR-0004)
+.deloop/canvas.json
+.deloop/dist/
+
+# Editor and OS
+.DS_Store
+*.local
+.env*.local
+
+# Build outputs
+*.tsbuildinfo
+
+# Playwright
+playwright-report/
+test-results/
