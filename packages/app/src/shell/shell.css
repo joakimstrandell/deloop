@@ -1,14 +1,14 @@
 /*
-  Shell styles — scoped to Deloop's outer UI (top bar, sidebars).
+  Shell styles — Deloop's outer UI (top bar, sidebars).
 
-  Tailwind v4 with wb- prefix.
-  TODO: Configure the wb- prefix in Tailwind v4 once the exact prefix API is confirmed.
-  For now, classes are written with the wb- prefix manually applied in JSX; this file
-  provides the Tailwind base layer and any shell-specific custom styles.
-
-  The canvas iframe is a completely separate document — no styles from here leak there.
+  The shell and canvas are completely separate browser documents (iframe boundary).
+  No CSS can cross that boundary — the browser enforces it. Standard Tailwind classes
+  are safe here; no prefix needed.
 */
 @import "tailwindcss";
+
+/* @deloop/ui is symlinked in node_modules — scan its source for Tailwind classes */
+@source "../../../ui/src";
 
 html,
 body,

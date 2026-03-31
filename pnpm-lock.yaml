@@ -20,6 +20,9 @@ importers:
 
   packages/app:
     dependencies:
+      '@deloop/ui':
+        specifier: workspace:*
+        version: link:../ui
       '@tanstack/react-router':
         specifier: ^1.168.10
         version: 1.168.10(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
@@ -102,6 +105,10 @@ importers:
         version: 3.2.4(@types/node@25.5.0)(jiti@2.6.1)(lightningcss@1.32.0)(tsx@4.21.0)
 
   packages/sample-app:
+    dependencies:
+      '@deloop/ui':
+        specifier: workspace:*
+        version: link:../ui
     devDependencies:
       '@deloop/cli':
         specifier: workspace:*
@@ -115,6 +122,19 @@ importers:
       react-dom:
         specifier: ^19.2.4
         version: 19.2.4(react@19.2.4)
+      typescript:
+        specifier: ^6.0.2
+        version: 6.0.2
+
+  packages/ui:
+    dependencies:
+      react:
+        specifier: ^19.2.4
+        version: 19.2.4
+    devDependencies:
+      '@types/react':
+        specifier: ^19.0.0
+        version: 19.2.14
       typescript:
         specifier: ^6.0.2
         version: 6.0.2

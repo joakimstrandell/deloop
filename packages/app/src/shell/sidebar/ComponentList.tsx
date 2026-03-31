@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Button } from "@deloop/ui";
 import type { ComponentInfo } from "../../types.js";
 
 interface Props {
@@ -23,43 +24,30 @@ export function ComponentList({ onSelect }: Props) {
       });
   }, []);
 
-  const baseStyle = {
-    padding: "4px 8px 12px",
-    fontSize: "12px",
-    color: "#6b7280",
-  };
-
-  if (loading) return <div style={baseStyle}>Discovering components…</div>;
-  if (error) return <div style={{ ...baseStyle, color: "#f87171" }}>Error: {error}</div>;
+  if (loading) {
+    return <p className="px-4 py-3 text-xs text-gray-500">Discovering components…</p>;
+  }
+  if (error) {
+    return <p className="px-4 py-3 text-xs text-red-400">Error: {error}</p>;
+  }
   if (components.length === 0) {
-    return <div style={baseStyle}>No components found in src/components/</div>;
+    return (
+      <p className="px-4 py-3 text-xs text-gray-500">No components found in src/components/</p>
+    );
   }
 
   return (
-    <ul style={{ flex: 1, overflowY: "auto", margin: 0, padding: "4px 0", listStyle: "none" }}>
+    <ul className="flex-1 overflow-y-auto py-1 list-none m-0 p-0">
       {components.map((component) => (
         <li key={component.path}>
-          <button
+          <Button
+            variant="ghost"
+            size="sm"
+            className="w-full justify-start px-4 py-1.5 rounded-none text-gray-300 text-[13px]"
             onClick={() => onSelect(component)}
-            style={{
-              width: "100%",
-              padding: "6px 16px",
-              textAlign: "left",
-              fontSize: "13px",
-              color: "#d1d5db",
-              background: "none",
-              border: "none",
-              cursor: "pointer",
-            }}
-            onMouseEnter={(e) => {
-              (e.currentTarget as HTMLButtonElement).style.background = "#111827";
-            }}
-            onMouseLeave={(e) => {
-              (e.currentTarget as HTMLButtonElement).style.background = "none";
-            }}
           >
             {component.name}
-          </button>
+          </Button>
         </li>
       ))}
     </ul>

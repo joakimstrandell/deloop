@@ -21,8 +21,8 @@ See PRD: `~/Downloads/PRD-Deloop-v0.8.md`
   The Vite server uses `server.fs.allow` to access user files. Never assume a fixed project path.
 - `packages/cli` must never import browser APIs.
 - `packages/app` must never import Node.js APIs.
-- Shell styles use the `wb-` Tailwind prefix. Nothing unprefixed. The iframe fully isolates
-  styles anyway, but the prefix signals intent and prevents accidents.
+- Shell and canvas both use standard Tailwind (no prefix). The iframe boundary is a hard
+  browser guarantee — CSS cannot cross document boundaries. File location signals context.
 
 ## postMessage contract
 

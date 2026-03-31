@@ -1,5 +1,6 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
+import "./canvas.css";
 import { IframeApp } from "./IframeApp.js";
 
 const rootEl = document.getElementById("root");

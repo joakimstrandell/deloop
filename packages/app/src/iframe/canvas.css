@@ -1,0 +1,22 @@
+/*
+  Canvas iframe styles — loaded inside the isolated canvas document.
+
+  @import "tailwindcss" gives the canvas a full Tailwind environment so that
+  components from @deloop/ui (and any user project that uses Tailwind) render
+  correctly. The canvas is a separate browser document from the shell — no
+  styles leak between them.
+
+  Later: user project style entry points (global CSS, font imports, CSS custom
+  properties) will also be injected here based on .deloop/config.ts.
+*/
+@import "tailwindcss";
+
+/* Tailwind v4 excludes node_modules from scanning by default.
+   @deloop/ui is symlinked there, so we add its source explicitly. */
+@source "../../../ui/src";
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}

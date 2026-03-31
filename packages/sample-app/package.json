@@ -6,6 +6,9 @@
   "scripts": {
     "dev": "deloop --port 4242"
   },
+  "dependencies": {
+    "@deloop/ui": "workspace:*"
+  },
   "devDependencies": {
     "@deloop/cli": "workspace:*",
     "@types/react": "^19.0.0",
