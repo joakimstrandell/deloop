@@ -1,6 +1,6 @@
 # Deloop
 
-Deloop is a design system workbench: a spatial canvas for rendering real React components from your project in an isolated iframe.
+Deloop lets you build design systems in code with the speed and spatial feel of a design canvas.
 
 ## Current Project Status
 
