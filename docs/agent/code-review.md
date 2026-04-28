@@ -62,6 +62,16 @@ ask only questions 2, 3, and 4 unless issue linkage is missing.
 - Manual review should use a fresh local checkout or a fresh local worktree of the PR branch.
 - Do not depend on reusing a deleted reviewer worktree.
 
+## Default Review Sequence
+
+1. Implementation agent opens PR for a single Linear issue scope.
+2. Review agent performs structured PR review and posts findings on GitHub.
+3. Human + agent perform manual co-review locally on a fresh checkout/worktree of the PR branch.
+4. Approved fixes are applied in follow-up commits.
+5. Final manual confirmation determines merge readiness.
+
+AI review is advisory. Merge requires explicit manual approval.
+
 ## Review Checklist
 
 1. Scope match:
