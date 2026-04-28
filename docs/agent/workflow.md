@@ -34,6 +34,11 @@ Default behavior when user does not specify:
 - use isolated worktree,
 - use subagent only when parallelization is useful.
 
+Before creating a new feature/review branch/worktree, run branch hygiene:
+
+1. `git fetch --prune`
+2. delete local branches already merged to `main` (excluding `main`)
+
 ## Linear Requirement (always)
 
 - No implementation starts without a Linear issue.
@@ -93,3 +98,4 @@ Worktrees are recommended for parallel issue work or clean context isolation.
 - Implementation worktree should be removed after branch is pushed and PR is opened.
 - Review worktree should be removed after review feedback is posted.
 - For follow-up commits after review, create a fresh worktree for that cycle.
+- Keep local branch list clean with branch hygiene at each new kickoff.

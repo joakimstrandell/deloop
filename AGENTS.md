@@ -27,6 +27,7 @@ See PRD: `~/Downloads/PRD-Deloop-v0.8.md`
   or `docs/agent/code-review.md` (issue selection, subagent yes/no, isolation context).
 - Branch naming follows `<type>/awk-123-short-topic` from `docs/agent/workflow.md`.
 - Isolated worktrees should be cleaned up after implementation/review handoff.
+- Run branch hygiene (`git fetch --prune` + merged branch cleanup) before new kickoff.
 
 ## Agent Playbooks
 
