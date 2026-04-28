@@ -23,6 +23,10 @@ See PRD: `~/Downloads/PRD-Deloop-v0.8.md`
 
 - Linear is the source of truth for feature scope and acceptance criteria.
 - Default execution model is one issue per branch/worktree and one PR per issue.
+- Before implementation/review kickoff, run the required decision gate in `docs/agent/workflow.md`
+  or `docs/agent/code-review.md` (issue selection, subagent yes/no, isolation context).
+- Branch naming follows `<type>/awk-123-short-topic` from `docs/agent/workflow.md`.
+- Isolated worktrees should be cleaned up after implementation/review handoff.
 
 ## Agent Playbooks
 

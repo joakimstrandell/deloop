@@ -15,6 +15,41 @@ Every review must use:
 
 If no Linear issue is linked, the review verdict is `needs changes` until an issue is created and linked.
 
+When a PR URL or PR ID is provided, the reviewer should read the PR first and derive the linked
+Linear issue from the PR context. If the PR does not clearly reference a Linear issue, flag it as
+`needs changes`.
+
+## Reviewer Kickoff Decision Gate (required)
+
+Before starting review, explicitly answer:
+
+1. Which Linear issue is this PR evaluated against?
+   - If PR URL/ID is provided, infer this from the PR first.
+   - If not inferable from PR context, request/flag missing issue linkage.
+2. Should review run in parallel using a subagent?
+   - Answer must be `yes` or `no`.
+3. Where should review run?
+   - `isolated worktree` (recommended default), or
+   - `current/main worktree`.
+4. Review scope:
+   - `full PR`, or
+   - `targeted` (specific files/concerns).
+
+Default behavior when user does not specify:
+
+- review full PR against linked Linear issue,
+- use isolated worktree,
+- use subagent only when parallelization is useful.
+
+If kickoff is requested with a PR URL/ID, treat issue detection as pre-resolved from PR context and
+ask only questions 2, 3, and 4 unless issue linkage is missing.
+
+## Reviewer Worktree Lifecycle
+
+- Use an isolated worktree by default for review runs.
+- Delete the review worktree after posting review feedback.
+- If another review pass is needed after new commits, create a fresh review worktree.
+
 ## Review Checklist
 
 1. Scope match:

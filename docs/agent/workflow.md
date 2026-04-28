@@ -16,6 +16,24 @@ Define the default implementation workflow for Deloop. Linear is the source of t
 
 Use one PR per issue by default. Split further only when a single issue is too large to review safely.
 
+## Kickoff Decision Gate (required before implementation)
+
+Before starting implementation, explicitly answer:
+
+1. Which Linear issue is being implemented?
+   - If no issue ID is provided, list relevant Linear issues and ask the user to pick one.
+2. Should implementation run in parallel using a subagent?
+   - Answer must be `yes` or `no`.
+3. Where should implementation run?
+   - `isolated worktree` (recommended default), or
+   - `current/main worktree`.
+
+Default behavior when user does not specify:
+
+- choose one Linear issue explicitly before coding,
+- use isolated worktree,
+- use subagent only when parallelization is useful.
+
 ## Linear Requirement (always)
 
 - No implementation starts without a Linear issue.
@@ -24,7 +42,9 @@ Use one PR per issue by default. Split further only when a single issue is too l
 
 ## Branch and PR Naming
 
-- Branch: `joakim/awk-123-short-topic`
+- Branch format: `<type>/awk-123-short-topic`
+- Allowed branch types: `feat`, `fix`, `refactor`, `docs`, `test`, `task`
+- Example: `feat/awk-9-project-scaffolding-and-cli-entry-point`
 - PR title: `feat(scope): short intent (AWK-123)` (or `fix`, `refactor`, `docs`, `test`)
 - Branches for feature work must map to a Linear issue key in the branch name.
 - PR description must explicitly mention and link the Linear issue.
@@ -65,3 +85,11 @@ Worktrees are recommended for parallel issue work or clean context isolation.
 - Use a worktree when juggling multiple active issues.
 - Use a normal branch in the main working copy when handling one issue at a time.
 - Both are valid as long as one issue maps to one PR.
+- For implementation agents, isolated worktree is the default unless the user requests current/main worktree.
+
+## Worktree Lifecycle (avoid stale worktrees)
+
+- Create a dedicated isolated worktree for implementation/review by default.
+- Implementation worktree should be removed after branch is pushed and PR is opened.
+- Review worktree should be removed after review feedback is posted.
+- For follow-up commits after review, create a fresh worktree for that cycle.
