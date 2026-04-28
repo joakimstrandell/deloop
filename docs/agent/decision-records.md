@@ -36,11 +36,14 @@ Use:
 
 ```md
 # ADR-NNNN: Title
+
 Status: Proposed | Accepted | Deprecated | Superseded by ADR-NNNN
 Date: YYYY-MM-DD
 
 ## Context
+
 ## Decision
+
 ## Consequences
 ```
 

@@ -18,6 +18,7 @@ See ADR-0003 for the monorepo decision, ADR-0001 for iframe isolation, ADR-0002 
 the Vite programmatic API approach.
 
 The proof-of-concept path:
+
 1. CLI starts a Vite dev server (programmatic API)
 2. Vite server has `server.fs.allow` set to include `packages/sample-app/`
 3. Shell app fetches `/api/components` and displays the list
@@ -48,6 +49,7 @@ This requires the path to be within `server.fs.allow`.
 ## Files created
 
 See git log for the full list. Key files:
+
 - `CLAUDE.md` — agent instructions
 - `docs/adr/000[1-5]-*.md` — five architecture decisions
 - `packages/cli/src/` — server, component discovery, Vite instance

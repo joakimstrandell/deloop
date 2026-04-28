@@ -2,10 +2,10 @@
   "name": "@deloop/cli",
   "version": "0.0.0",
   "private": true,
-  "type": "module",
   "bin": {
     "deloop": "./bin/deloop.js"
   },
+  "type": "module",
   "scripts": {
     "dev": "tsx src/index.ts",
     "build": "tsdown src/index.ts --format esm --out-dir dist",

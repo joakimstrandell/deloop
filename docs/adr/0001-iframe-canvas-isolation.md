@@ -27,6 +27,7 @@ environment. No scoping hacks are needed.
 ## Consequences
 
 **Better:**
+
 - Complete style isolation with zero effort — the browser enforces it.
 - Components render in their real environment: correct fonts, resets, custom properties.
 - Token hot-reload works via `postMessage` → CSS variable injection into the iframe's `:root`.
@@ -34,6 +35,7 @@ environment. No scoping hacks are needed.
   of this model.
 
 **Worse:**
+
 - Communication between shell and canvas must go through `postMessage` — slightly more
   infrastructure than direct DOM access.
 - Reaching inside the iframe in Playwright tests requires `frameLocator` — small but real

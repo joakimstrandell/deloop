@@ -43,6 +43,18 @@ CLI options:
 - Shows discovered components in the shell sidebar
 - Mounts selected components into an isolated canvas iframe
 
+## Current limitations (P0)
+
+- Currently tested and supported with React 19.x projects
+- Component discovery is currently focused on `src/components/**/*.tsx`
+- CLI distribution is not published yet (local/dev usage from this repo)
+- Token editing, theme management, and advanced canvas capabilities are not in scope yet
+
+## Compatibility
+
+- Currently tested and supported: React 19.x
+- React 18 support is planned and intended, but not yet guaranteed in this repository
+
 ## Troubleshooting
 
 - Port already in use: run with `--port <another-port>`

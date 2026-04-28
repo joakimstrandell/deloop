@@ -26,11 +26,23 @@ Default URL: `http://localhost:4242`
 From repo root:
 
 ```bash
+pnpm lint
+pnpm format:check
 pnpm check
 pnpm test:unit
 pnpm install:browsers
 pnpm test:e2e
 ```
+
+Use `pnpm format` to apply formatting changes.
+
+## Pre-commit hook
+
+This repo uses Husky + lint-staged:
+
+- pre-commit runs `pnpm lint-staged`
+- staged JS/TS files are linted with `oxlint --fix` and formatted with `oxfmt`
+- staged JSON files are formatted with `oxfmt`
 
 ## Repository layout
 

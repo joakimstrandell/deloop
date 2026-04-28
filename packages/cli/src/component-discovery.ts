@@ -19,18 +19,11 @@ export interface ComponentInfo {
  * This function is pure (no side effects beyond filesystem reads) and
  * is covered by unit tests in src/component-discovery.test.ts.
  */
-export async function discoverComponents(
-  projectRoot: string,
-): Promise<ComponentInfo[]> {
+export async function discoverComponents(projectRoot: string): Promise<ComponentInfo[]> {
   const files = await fg("src/components/**/*.tsx", {
     cwd: projectRoot,
     absolute: true,
-    ignore: [
-      "**/*.test.tsx",
-      "**/*.spec.tsx",
-      "**/*.stories.tsx",
-      "**/*.story.tsx",
-    ],
+    ignore: ["**/*.test.tsx", "**/*.spec.tsx", "**/*.stories.tsx", "**/*.story.tsx"],
   });
 
   return files.map((filePath) => ({

@@ -18,9 +18,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
  * the CLI is published to npm, this path must be updated to reference
  * bundled app assets. See ADR-0002 for context.
  */
-export async function createViteComponentServer(
-  projectRoot: string,
-): Promise<ViteDevServer> {
+export async function createViteComponentServer(projectRoot: string): Promise<ViteDevServer> {
   // In the workspace: packages/cli/src/ → ../../app = packages/app/
   const appRoot = join(__dirname, "../../app");
 

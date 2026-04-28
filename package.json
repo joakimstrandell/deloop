@@ -1,23 +1,43 @@
 {
   "name": "deloop",
-  "private": true,
   "version": "0.0.0",
+  "private": true,
   "type": "module",
   "scripts": {
-    "check": "pnpm --recursive run check",
+    "lint": "pnpm exec oxlint .",
+    "format": "pnpm exec oxfmt .",
+    "format:check": "pnpm exec oxfmt --check .",
+    "check": "pnpm lint && pnpm format:check && pnpm --recursive run check",
     "test:unit": "pnpm --recursive run test:unit",
     "test:e2e": "playwright test",
-    "install:browsers": "playwright install chromium"
+    "install:browsers": "playwright install chromium",
+    "prepare": "husky"
   },
   "devDependencies": {
     "@playwright/test": "^1.58.2",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.4.0",
+    "oxfmt": "^0.47.0",
+    "oxlint": "^1.62.0",
     "tsx": "^4.21.0",
     "typescript": "^6.0.2"
+  },
+  "lint-staged": {
+    "*.{js,jsx,ts,tsx,mjs,cjs}": [
+      "pnpm exec oxlint --fix",
+      "pnpm exec oxfmt"
+    ],
+    "*.{json,jsonc}": [
+      "pnpm exec oxfmt"
+    ]
   },
   "engines": {
     "node": ">=24"
   },
   "pnpm": {
-    "onlyBuiltDependencies": ["esbuild", "@playwright/test"]
+    "onlyBuiltDependencies": [
+      "esbuild",
+      "@playwright/test"
+    ]
   }
 }

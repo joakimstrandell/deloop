@@ -11,11 +11,7 @@ export interface ServerOptions {
   open: boolean;
 }
 
-export async function startServer({
-  root,
-  port,
-  open,
-}: ServerOptions): Promise<void> {
+export async function startServer({ root, port, open }: ServerOptions): Promise<void> {
   const app = express();
   const httpServer = createHttpServer(app);
 
