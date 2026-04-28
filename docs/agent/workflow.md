@@ -28,6 +28,7 @@ Use one PR per issue by default. Split further only when a single issue is too l
 - PR title: `feat(scope): short intent (AWK-123)` (or `fix`, `refactor`, `docs`, `test`)
 - Branches for feature work must map to a Linear issue key in the branch name.
 - PR description must explicitly mention and link the Linear issue.
+- The linked Linear issue must also include the PR URL once the PR is opened.
 - PRs without a linked Linear issue should not be merged.
 - Commit message: Conventional Commits + issue key, for example:
   - `feat(cli): scaffold .deloop config bootstrap (AWK-9)`

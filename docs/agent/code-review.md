@@ -20,6 +20,7 @@ If no Linear issue is linked, the review verdict is `needs changes` until an iss
 1. Scope match:
    - Does the implementation satisfy the Linear issue acceptance criteria?
    - Is there scope drift beyond the issue?
+   - Is PR/Linear linkage complete in both directions (PR mentions issue, issue links PR)?
 2. Architecture and conventions:
    - Are `AGENTS.md` invariants respected?
    - Are package boundaries and shell/iframe message contracts preserved?
