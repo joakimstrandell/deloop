@@ -50,6 +50,14 @@ ask only questions 2, 3, and 4 unless issue linkage is missing.
 - Delete the review worktree after posting review feedback.
 - If another review pass is needed after new commits, create a fresh review worktree.
 
+## Context Preservation and Manual Follow-up
+
+- Review worktrees are ephemeral; review context must be preserved in GitHub PR comments.
+- Reviewer should post a structured summary (verdict, must-fix/should-fix items, test gaps) so
+  context survives worktree cleanup.
+- Manual review should use a fresh local checkout or a fresh local worktree of the PR branch.
+- Do not depend on reusing a deleted reviewer worktree.
+
 ## Review Checklist
 
 1. Scope match:
