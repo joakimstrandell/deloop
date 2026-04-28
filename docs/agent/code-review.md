@@ -1,0 +1,54 @@
+# Code Review Playbook
+
+## Purpose
+
+Provide a consistent, issue-aware review process for PRs using human or agent reviewers.
+
+## Inputs
+
+Every review must use:
+
+- the linked Linear issue (`AWK-xxx`) as scope and acceptance source of truth,
+- `AGENTS.md`,
+- `docs/agent/testing.md`,
+- the full PR diff and changed files.
+
+If no Linear issue is linked, the review verdict is `needs changes` until an issue is created and linked.
+
+## Review Checklist
+
+1. Scope match:
+   - Does the implementation satisfy the Linear issue acceptance criteria?
+   - Is there scope drift beyond the issue?
+2. Architecture and conventions:
+   - Are `AGENTS.md` invariants respected?
+   - Are package boundaries and shell/iframe message contracts preserved?
+3. Tests and verification:
+   - Are required unit/integration/E2E tests present for changed behavior?
+   - Is evidence for `pnpm check`, unit, and relevant E2E coverage provided?
+4. Risk and regressions:
+   - Any behavioral regressions, compatibility risks, or missing migrations?
+
+## Severity Levels
+
+- `must-fix`: correctness, security, regression, acceptance criteria miss, architecture contract violation.
+- `should-fix`: meaningful maintainability/testability concern that should be resolved before merge when practical.
+- `nit`: optional style/readability improvement; does not block merge.
+
+## Output Format
+
+Use this structure in PR review comments:
+
+1. **Verdict**: `ready` or `needs changes`
+2. **Must-fix findings**
+3. **Should-fix findings**
+4. **Nits (optional)**
+5. **Acceptance criteria coverage**
+6. **Test coverage assessment**
+
+## Scope Guardrails
+
+- Do not request out-of-scope feature work unless it is required to safely ship the issue.
+- Prefer precise, actionable suggestions over broad refactor asks.
+- If scope is wrong, recommend updating Linear first.
+- If new work surfaced in review is substantial, recommend creating a new Linear issue instead of expanding the current PR scope.

@@ -28,6 +28,7 @@ See PRD: `~/Downloads/PRD-Deloop-v0.8.md`
 
 - Workflow and Linear usage: `docs/agent/workflow.md`
 - Testing strategy and required checks: `docs/agent/testing.md`
+- PR review process: `docs/agent/code-review.md`
 - ADR policy and decision logging: `docs/agent/decision-records.md`
 
 ## Terminology
