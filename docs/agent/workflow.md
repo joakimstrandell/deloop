@@ -27,12 +27,16 @@ Before starting implementation, explicitly answer:
 3. Where should implementation run?
    - `isolated worktree` (recommended default), or
    - `current/main worktree`.
+4. Which model should implementation use?
+   - explicit model, or
+   - `default`.
 
 Default behavior when user does not specify:
 
 - choose one Linear issue explicitly before coding,
 - use isolated worktree,
-- use subagent only when parallelization is useful.
+- use subagent only when parallelization is useful,
+- use default model unless user requests a specific model.
 
 Before creating a new feature/review branch/worktree, run branch hygiene:
 

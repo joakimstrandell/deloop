@@ -34,12 +34,16 @@ Before starting review, explicitly answer:
 4. Review scope:
    - `full PR`, or
    - `targeted` (specific files/concerns).
+5. Which model should review use?
+   - explicit model, or
+   - `default`.
 
 Default behavior when user does not specify:
 
 - review full PR against linked Linear issue,
 - use isolated worktree,
-- use subagent only when parallelization is useful.
+- use subagent only when parallelization is useful,
+- use default model unless user requests a specific model.
 
 If kickoff is requested with a PR URL/ID, treat issue detection as pre-resolved from PR context and
 ask only questions 2, 3, and 4 unless issue linkage is missing.
