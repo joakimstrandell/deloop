@@ -14,7 +14,7 @@ inside a Vite-powered iframe — before building product on top.
 ## Approach
 
 Full pnpm workspace monorepo from day one, matching the final published structure.
-See ADR-0004 for the monorepo decision, ADR-0001 for iframe isolation, ADR-0002 for
+See ADR-0003 for the monorepo decision, ADR-0001 for iframe isolation, ADR-0002 for
 the Vite programmatic API approach.
 
 The proof-of-concept path:

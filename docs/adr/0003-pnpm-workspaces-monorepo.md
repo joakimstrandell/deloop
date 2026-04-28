@@ -1,4 +1,4 @@
-# ADR-0004: pnpm workspaces monorepo
+# ADR-0003: pnpm workspaces monorepo
 
 **Status:** Accepted
 **Date:** 2026-03-31

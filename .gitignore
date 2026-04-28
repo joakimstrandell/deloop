@@ -2,7 +2,7 @@ node_modules/
 dist/
 .cache/
 
-# Deloop project state — gitignored by default (see ADR-0004)
+# Deloop project state — gitignored by default (see ADR-0003)
 .deloop/canvas.json
 .deloop/dist/
 
