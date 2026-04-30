@@ -13,15 +13,10 @@ export interface ComponentRegistry {
   close(): Promise<void>;
 }
 
-const GLOB_CHARS = /[*?{}[\]()!]/;
-
 function watchPathFor(projectRoot: string, source: string): string {
-  // chokidar accepts both globs and directory paths. We pass the raw user
-  // entry through (resolved against projectRoot) so a glob like
-  // "src/widgets/**/*.tsx" still works without extra parsing.
-  if (GLOB_CHARS.test(source)) {
-    return join(projectRoot, source);
-  }
+  // chokidar accepts both globs and directory paths, so we resolve the raw
+  // user entry against projectRoot without extra parsing. A glob like
+  // "src/widgets/**/*.tsx" reaches chokidar unchanged.
   return join(projectRoot, source);
 }
 

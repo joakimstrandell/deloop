@@ -42,9 +42,7 @@ export async function loadDeloopConfig(projectRoot: string): Promise<DeloopConfi
   const configPath = join(projectRoot, ".deloop/config.ts");
   if (!existsSync(configPath)) return null;
 
-  // Cache-bust on every load so config changes during a single process pick up.
-  // tsImport keys on URL, so a query parameter forces a fresh evaluation.
-  const url = `${pathToFileURL(configPath).href}?t=${Date.now()}`;
+  const url = pathToFileURL(configPath).href;
 
   let mod: Record<string, unknown>;
   try {
