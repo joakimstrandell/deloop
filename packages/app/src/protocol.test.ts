@@ -64,6 +64,18 @@ describe("parseShellToIframeMessage", () => {
     ).toBeNull();
   });
 
+  it("rejects mount and updateProps when props is an array", () => {
+    expect(
+      parseShellToIframeMessage({
+        type: "mount",
+        cardId: "x",
+        componentPath: "/x",
+        props: ["not", "an", "object"],
+      }),
+    ).toBeNull();
+    expect(parseShellToIframeMessage({ type: "updateProps", cardId: "x", props: [] })).toBeNull();
+  });
+
   it("rejects setPseudoState with an unsupported state", () => {
     expect(
       parseShellToIframeMessage({ type: "setPseudoState", cardId: "x", state: "exploding" }),

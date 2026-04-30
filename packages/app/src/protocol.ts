@@ -24,10 +24,9 @@ function isObject(value: unknown): value is Record<string, unknown> {
 }
 
 function isPlainProps(value: unknown): value is Record<string, unknown> {
-  // We accept any non-null object as props. Functions/arrays would not survive
-  // structured cloning across postMessage anyway, so the runtime already
-  // narrows the practical input.
-  return isObject(value);
+  // Reject arrays explicitly: `typeof [] === "object"` so isObject lets them
+  // through, but a React component's props bag is never an array.
+  return isObject(value) && !Array.isArray(value);
 }
 
 export function parseShellToIframeMessage(input: unknown): ShellToIframeMessage | null {

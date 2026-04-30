@@ -97,7 +97,14 @@ export function IframeApp() {
               unknown
             >;
             const Component = mod["default"];
-            if (typeof Component !== "function") {
+            // Plain function components are functions; React.forwardRef,
+            // React.memo, and React.lazy wrap them in objects (with a
+            // $$typeof symbol). Either shape is renderable; anything else
+            // (string, number, null) is not a valid default export.
+            if (
+              Component == null ||
+              (typeof Component !== "function" && typeof Component !== "object")
+            ) {
               throw new Error(`${msg.componentPath} does not export a default React component`);
             }
             dispatch({
