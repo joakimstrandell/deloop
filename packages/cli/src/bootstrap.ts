@@ -2,7 +2,7 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 
-const DEFAULT_CONFIG = `// Deloop configuration. See https://github.com/awkwardgroup/deloop for available options.
+const DEFAULT_CONFIG = `// Deloop configuration. Add fields here to customize component discovery, styles, and more.
 export default {};
 `;
 
