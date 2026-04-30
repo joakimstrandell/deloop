@@ -1,173 +1,181 @@
 import { type ComponentType, useEffect, useReducer } from "react";
-import type { IframeToShellMessage, ShellToIframeMessage } from "../types.js";
+import { parseShellToIframeMessage } from "../protocol.js";
+import type { IframeToShellMessage, PseudoState } from "../types.js";
 
-interface MountedComponent {
-  id: string;
-  /** Vite /@fs/ URL for the component module */
-  path: string;
+interface MountedCard {
+  cardId: string;
+  /** Vite /@fs/ URL or other module specifier for the component module. */
+  componentPath: string;
   props: Record<string, unknown>;
+  pseudoState: PseudoState;
   Component: ComponentType<Record<string, unknown>> | null;
   error: string | null;
 }
 
-type State = Map<string, MountedComponent>;
+type State = Map<string, MountedCard>;
 
 type Action =
-  | { type: "LOADING"; id: string; path: string; props: Record<string, unknown> }
-  | { type: "READY"; id: string; Component: ComponentType<Record<string, unknown>> }
-  | { type: "ERROR"; id: string; error: string }
-  | { type: "UNMOUNT"; id: string }
-  | { type: "UPDATE_PROPS"; id: string; props: Record<string, unknown> };
+  | { type: "MOUNT"; cardId: string; componentPath: string; props: Record<string, unknown> }
+  | { type: "RESOLVED"; cardId: string; Component: ComponentType<Record<string, unknown>> }
+  | { type: "FAILED"; cardId: string; error: string }
+  | { type: "UNMOUNT"; cardId: string }
+  | { type: "UPDATE_PROPS"; cardId: string; props: Record<string, unknown> }
+  | { type: "SET_PSEUDO_STATE"; cardId: string; state: PseudoState };
 
 function reducer(state: State, action: Action): State {
   const next = new Map(state);
   switch (action.type) {
-    case "LOADING":
-      next.set(action.id, {
-        id: action.id,
-        path: action.path,
+    case "MOUNT":
+      next.set(action.cardId, {
+        cardId: action.cardId,
+        componentPath: action.componentPath,
         props: action.props,
+        pseudoState: "default",
         Component: null,
         error: null,
       });
       return next;
-    case "READY": {
-      const entry = next.get(action.id);
-      if (entry) next.set(action.id, { ...entry, Component: action.Component });
+    case "RESOLVED": {
+      const entry = next.get(action.cardId);
+      if (entry) next.set(action.cardId, { ...entry, Component: action.Component });
       return next;
     }
-    case "ERROR": {
-      const entry = next.get(action.id);
-      if (entry) next.set(action.id, { ...entry, error: action.error });
+    case "FAILED": {
+      const entry = next.get(action.cardId);
+      if (entry) next.set(action.cardId, { ...entry, error: action.error });
       return next;
     }
     case "UNMOUNT":
-      next.delete(action.id);
+      next.delete(action.cardId);
       return next;
     case "UPDATE_PROPS": {
-      const entry = next.get(action.id);
-      if (entry) next.set(action.id, { ...entry, props: action.props });
+      const entry = next.get(action.cardId);
+      if (entry) next.set(action.cardId, { ...entry, props: action.props });
+      return next;
+    }
+    case "SET_PSEUDO_STATE": {
+      const entry = next.get(action.cardId);
+      if (entry) next.set(action.cardId, { ...entry, pseudoState: action.state });
       return next;
     }
   }
 }
 
 function postToShell(msg: IframeToShellMessage) {
-  window.parent.postMessage(msg, "*");
+  // Same-origin shell ↔ iframe per ADR-0001; pin targetOrigin to the
+  // iframe's own origin (which equals the shell's) instead of "*".
+  window.parent.postMessage(msg, window.location.origin);
 }
 
 export function IframeApp() {
-  const [mounted, dispatch] = useReducer(reducer, new Map<string, MountedComponent>());
+  const [mounted, dispatch] = useReducer(reducer, new Map<string, MountedCard>());
 
   useEffect(() => {
-    async function handleMessage(event: MessageEvent<ShellToIframeMessage>) {
-      const msg = event.data;
-      if (!msg?.type) return;
+    async function handleMessage(event: MessageEvent<unknown>) {
+      // Only accept messages from our parent shell document. Mirrors the
+      // shell-side guard at App.tsx and prevents accidental processing of
+      // messages from nested iframes, browser extensions, or window openers.
+      if (event.source !== window.parent) return;
+      const msg = parseShellToIframeMessage(event.data);
+      if (!msg) return;
 
       switch (msg.type) {
-        case "MOUNT_COMPONENT": {
-          dispatch({ type: "LOADING", id: msg.id, path: msg.path, props: msg.props });
+        case "mount": {
+          dispatch({
+            type: "MOUNT",
+            cardId: msg.cardId,
+            componentPath: msg.componentPath,
+            props: msg.props,
+          });
+          // Resolve the component module asynchronously. The placeholder
+          // card is already on screen via the synchronous MOUNT dispatch.
           try {
             // Vite serves user components via /@fs/ prefix (see ADR-0002).
             // The /* @vite-ignore */ comment suppresses the dynamic import warning.
-            const mod = (await import(/* @vite-ignore */ msg.path)) as Record<string, unknown>;
+            const mod = (await import(/* @vite-ignore */ msg.componentPath)) as Record<
+              string,
+              unknown
+            >;
             const Component = mod["default"];
-            if (typeof Component !== "function") {
-              throw new Error(`${msg.path} does not export a default React component`);
+            // Plain function components are functions; React.forwardRef,
+            // React.memo, and React.lazy wrap them in objects (with a
+            // $$typeof symbol). Either shape is renderable; anything else
+            // (string, number, null) is not a valid default export.
+            if (
+              Component == null ||
+              (typeof Component !== "function" && typeof Component !== "object")
+            ) {
+              throw new Error(`${msg.componentPath} does not export a default React component`);
             }
             dispatch({
-              type: "READY",
-              id: msg.id,
+              type: "RESOLVED",
+              cardId: msg.cardId,
               Component: Component as ComponentType<Record<string, unknown>>,
             });
-            postToShell({ type: "COMPONENT_READY", id: msg.id });
           } catch (err) {
             const error = err instanceof Error ? err.message : String(err);
-            dispatch({ type: "ERROR", id: msg.id, error });
-            postToShell({ type: "COMPONENT_ERROR", id: msg.id, error });
+            dispatch({ type: "FAILED", cardId: msg.cardId, error });
           }
           break;
         }
-        case "UNMOUNT_COMPONENT":
-          dispatch({ type: "UNMOUNT", id: msg.id });
+        case "unmount":
+          dispatch({ type: "UNMOUNT", cardId: msg.cardId });
           break;
-        case "UPDATE_PROPS":
-          dispatch({ type: "UPDATE_PROPS", id: msg.id, props: msg.props });
+        case "updateProps":
+          dispatch({ type: "UPDATE_PROPS", cardId: msg.cardId, props: msg.props });
+          break;
+        case "setPseudoState":
+          dispatch({ type: "SET_PSEUDO_STATE", cardId: msg.cardId, state: msg.state });
           break;
       }
     }
 
     window.addEventListener("message", handleMessage);
+    // Tell the shell the iframe is hydrated and ready to accept messages.
+    postToShell({ type: "iframeReady" });
     return () => window.removeEventListener("message", handleMessage);
   }, []);
 
   return (
-    <div
-      style={{
-        padding: "24px",
-        display: "flex",
-        flexWrap: "wrap",
-        gap: "24px",
-        minHeight: "100vh",
-        boxSizing: "border-box",
-      }}
-    >
+    <div className="flex min-h-screen flex-wrap content-start gap-6 p-6">
       {Array.from(mounted.values()).map((entry) => (
-        <ComponentCard key={entry.id} entry={entry} />
+        <ComponentCard
+          key={entry.cardId}
+          entry={entry}
+          onSelect={() => postToShell({ type: "cardSelected", cardId: entry.cardId })}
+        />
       ))}
     </div>
   );
 }
 
-function ComponentCard({ entry }: { entry: MountedComponent }) {
+function ComponentCard({ entry, onSelect }: { entry: MountedCard; onSelect: () => void }) {
   if (entry.error) {
     return (
       <div
-        style={{
-          border: "1px solid #dc2626",
-          borderRadius: "8px",
-          padding: "16px",
-          color: "#dc2626",
-          fontSize: "12px",
-          fontFamily: "monospace",
-          maxWidth: "400px",
-        }}
+        data-card-id={entry.cardId}
+        data-pseudo-state={entry.pseudoState}
+        className="max-w-md rounded-lg border border-red-600 p-4 font-mono text-xs text-red-600"
       >
-        <strong>Error loading {entry.id}</strong>
-        <pre style={{ marginTop: "8px", whiteSpace: "pre-wrap" }}>{entry.error}</pre>
-      </div>
-    );
-  }
-
-  if (!entry.Component) {
-    return (
-      <div
-        style={{
-          border: "1px solid #374151",
-          borderRadius: "8px",
-          padding: "16px",
-          color: "#9ca3af",
-          fontSize: "12px",
-        }}
-      >
-        Loading {entry.id}…
+        <strong>Error loading {entry.cardId}</strong>
+        <pre className="mt-2 whitespace-pre-wrap">{entry.error}</pre>
       </div>
     );
   }
 
   return (
-    <div style={{ border: "1px solid #e5e7eb", borderRadius: "8px", padding: "16px" }}>
-      <div
-        style={{
-          marginBottom: "12px",
-          fontSize: "11px",
-          color: "#9ca3af",
-          fontFamily: "monospace",
-        }}
-      >
-        {entry.id}
-      </div>
-      <entry.Component {...entry.props} />
+    <div
+      data-card-id={entry.cardId}
+      data-pseudo-state={entry.pseudoState}
+      onClick={onSelect}
+      className="rounded-lg border border-gray-200 p-4"
+    >
+      <div className="mb-3 font-mono text-[11px] text-gray-400">{entry.cardId}</div>
+      {entry.Component ? (
+        <entry.Component {...entry.props} />
+      ) : (
+        <div className="font-mono text-xs text-gray-500">Loading {entry.cardId}…</div>
+      )}
     </div>
   );
 }
