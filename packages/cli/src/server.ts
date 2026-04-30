@@ -4,6 +4,7 @@ import express from "express";
 import { WebSocketServer } from "ws";
 import { createViteComponentServer } from "./vite-component-server.js";
 import { discoverComponents } from "./component-discovery.js";
+import { bootstrapDeloopDir } from "./bootstrap.js";
 
 export interface ServerOptions {
   root: string;
@@ -16,6 +17,11 @@ export async function startServer({ root, port, open }: ServerOptions): Promise<
   const httpServer = createHttpServer(app);
 
   console.log(`[deloop] Starting with project root: ${root}`);
+
+  const created = await bootstrapDeloopDir(root);
+  if (created.length > 0) {
+    console.log(`[deloop] Initialized ${created.join(", ")}`);
+  }
 
   const vite = await createViteComponentServer(root);
 

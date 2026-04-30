@@ -9,7 +9,7 @@
     "format:check": "pnpm exec oxfmt --check .",
     "check": "pnpm lint && pnpm format:check && pnpm --recursive run check",
     "test:unit": "pnpm --recursive run test:unit",
-    "test:e2e": "playwright test",
+    "test:e2e": "playwright test --config e2e/playwright.config.ts",
     "install:browsers": "playwright install chromium",
     "prepare": "husky"
   },
