@@ -46,11 +46,17 @@ function expandSource(pattern: string): string {
  * Heuristic barrel-file detection.
  *
  * A file is considered a barrel/re-export when every non-empty, non-comment
- * statement is a re-export (e.g. `export * from "./X"` or
- * `export { Y } from "./X"`). We use a regex pass rather than a full AST
- * because barrels are syntactically simple and the cost of an AST parser
- * across every component file is not justified by the marginal accuracy
- * gain. Trade-off documented for future revisit if false positives appear.
+ * statement is a re-export. Recognized forms:
+ *   - `export * from "./X"`
+ *   - `export * as ns from "./X"`
+ *   - `export { A, B } from "./X"` (single- or multi-line)
+ *   - `export type { A, B } from "./X"` (single- or multi-line)
+ *
+ * We use a regex pass rather than a full AST because barrels are
+ * syntactically simple and the cost of an AST parser across every
+ * component file is not justified by the marginal accuracy gain.
+ * Multi-line `{...}` braces are flattened before statement splitting so
+ * Prettier's default-width re-exports are detected.
  */
 function isBarrelFile(source: string): boolean {
   const stripped = source
@@ -62,14 +68,23 @@ function isBarrelFile(source: string): boolean {
 
   if (stripped.length === 0) return false;
 
-  const statements = stripped
+  // Flatten newlines inside `{...}` so multi-line named re-exports survive
+  // the statement split below. We don't need a real parser here because
+  // braces in re-export specifiers don't nest.
+  const flattened = stripped.replace(
+    /\{([^{}]*)\}/g,
+    (_, inner: string) => `{${inner.replace(/\s+/g, " ").trim()}}`,
+  );
+
+  const statements = flattened
     .split(/;|\n/)
     .map((s) => s.trim())
     .filter((s) => s.length > 0);
 
   if (statements.length === 0) return false;
 
-  const reExportPattern = /^export\s+(?:\*|\{[^}]*\}|type\s+\{[^}]*\})\s+from\s+["'][^"']+["']$/;
+  const reExportPattern =
+    /^export\s+(?:\*(?:\s+as\s+\w+)?|type\s*\{[^}]*\}|\{[^}]*\})\s+from\s+["'][^"']+["']$/;
 
   return statements.every((s) => reExportPattern.test(s));
 }

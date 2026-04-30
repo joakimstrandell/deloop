@@ -141,6 +141,27 @@ describe("discoverComponents", () => {
       const names = result.map((c) => c.name);
       expect(names).toEqual(["Button"]);
     });
+
+    it("excludes namespace re-exports (export * as ns from)", async () => {
+      root = makeProject({
+        "src/components/Button.tsx": "export default function Button(){ return null; }",
+        "src/components/index.tsx": `export * as buttons from "./Button";\n`,
+      });
+      const result = await discoverComponents(root);
+      const names = result.map((c) => c.name).sort();
+      expect(names).toEqual(["Button"]);
+    });
+
+    it("excludes multi-line named re-exports", async () => {
+      root = makeProject({
+        "src/components/Button.tsx": "export default function Button(){ return null; }",
+        "src/components/Card.tsx": "export default function Card(){ return null; }",
+        "src/components/index.tsx": `export {\n  Button,\n  Card,\n} from "./components";\n`,
+      });
+      const result = await discoverComponents(root);
+      const names = result.map((c) => c.name).sort();
+      expect(names).toEqual(["Button", "Card"]);
+    });
   });
 
   describe("forwardRef wrappers", () => {
