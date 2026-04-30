@@ -34,12 +34,16 @@ Before starting review, explicitly answer:
 4. Review scope:
    - `full PR`, or
    - `targeted` (specific files/concerns).
+5. Which model should review use?
+   - explicit model, or
+   - `default`.
 
 Default behavior when user does not specify:
 
 - review full PR against linked Linear issue,
 - use isolated worktree,
-- use subagent only when parallelization is useful.
+- use subagent only when parallelization is useful,
+- use default model unless user requests a specific model.
 
 If kickoff is requested with a PR URL/ID, treat issue detection as pre-resolved from PR context and
 ask only questions 2, 3, and 4 unless issue linkage is missing.
@@ -49,6 +53,24 @@ ask only questions 2, 3, and 4 unless issue linkage is missing.
 - Use an isolated worktree by default for review runs.
 - Delete the review worktree after posting review feedback.
 - If another review pass is needed after new commits, create a fresh review worktree.
+
+## Context Preservation and Manual Follow-up
+
+- Review worktrees are ephemeral; review context must be preserved in GitHub PR comments.
+- Reviewer should post a structured summary (verdict, must-fix/should-fix items, test gaps) so
+  context survives worktree cleanup.
+- Manual review should use a fresh local checkout or a fresh local worktree of the PR branch.
+- Do not depend on reusing a deleted reviewer worktree.
+
+## Default Review Sequence
+
+1. Implementation agent opens PR for a single Linear issue scope.
+2. Review agent performs structured PR review and posts findings on GitHub.
+3. Human + agent perform manual co-review locally on a fresh checkout/worktree of the PR branch.
+4. Approved fixes are applied in follow-up commits.
+5. Final manual confirmation determines merge readiness.
+
+AI review is advisory. Merge requires explicit manual approval.
 
 ## Review Checklist
 

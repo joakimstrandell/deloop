@@ -25,6 +25,7 @@ See PRD: `~/Downloads/PRD-Deloop-v0.8.md`
 - Default execution model is one issue per branch/worktree and one PR per issue.
 - Before implementation/review kickoff, run the required decision gate in `docs/agent/workflow.md`
   or `docs/agent/code-review.md` (issue selection, subagent yes/no, isolation context).
+- Include model selection in kickoff (`explicit model` or `default`) for implementation/review.
 - Branch naming follows `<type>/awk-123-short-topic` from `docs/agent/workflow.md`.
 - Isolated worktrees should be cleaned up after implementation/review handoff.
 - Run branch hygiene (`git fetch --prune` + merged branch cleanup) before new kickoff.
