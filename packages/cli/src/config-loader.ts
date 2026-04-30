@@ -23,7 +23,7 @@ export interface DeloopConfig {
  *
  * Returns:
  *   - the default-exported config object on success,
- *   - `null` when the file does not exist.
+ *   - `null` when the file does not exist or when loading fails.
  *
  * Uses `tsx`'s `tsImport` to evaluate the TypeScript module without
  * requiring a precompile step. We picked `tsImport` over `jiti` because
@@ -33,6 +33,10 @@ export interface DeloopConfig {
  * `tsImport` returns a CJS-style namespace where the user's default export
  * lives at `mod.default.default`. We unwrap that here so callers receive a
  * plain config object.
+ *
+ * Errors during import (syntax errors, runtime throws at module top level,
+ * etc.) are caught and reported to stderr; the CLI then falls back to the
+ * "no config" path so a malformed user config never crashes the dev server.
  */
 export async function loadDeloopConfig(projectRoot: string): Promise<DeloopConfig | null> {
   const configPath = join(projectRoot, ".deloop/config.ts");
@@ -41,7 +45,17 @@ export async function loadDeloopConfig(projectRoot: string): Promise<DeloopConfi
   // Cache-bust on every load so config changes during a single process pick up.
   // tsImport keys on URL, so a query parameter forces a fresh evaluation.
   const url = `${pathToFileURL(configPath).href}?t=${Date.now()}`;
-  const mod = (await tsImport(url, import.meta.url)) as Record<string, unknown>;
+
+  let mod: Record<string, unknown>;
+  try {
+    mod = (await tsImport(url, import.meta.url)) as Record<string, unknown>;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.warn(
+      `[deloop] failed to load .deloop/config.ts: ${message}\n[deloop] falling back to default component discovery.`,
+    );
+    return null;
+  }
 
   const exported = unwrapDefault(mod);
   if (exported == null || typeof exported !== "object") {

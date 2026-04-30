@@ -1,4 +1,4 @@
-import { describe, it, expect, afterEach } from "vitest";
+import { describe, it, expect, afterEach, vi } from "vitest";
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
@@ -58,5 +58,46 @@ describe("loadDeloopConfig", () => {
     const result = await loadDeloopConfig(root);
 
     expect(result?.components).toEqual(["src/widgets", "src/forms"]);
+  });
+
+  describe("malformed user config", () => {
+    it("returns null and warns when the config has a syntax error", async () => {
+      root = makeRoot();
+      mkdirSync(join(root, ".deloop"), { recursive: true });
+      // Truncated object literal — syntactically invalid TypeScript.
+      writeFileSync(join(root, ".deloop/config.ts"), `export default {\n`, "utf8");
+
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      try {
+        const result = await loadDeloopConfig(root);
+        expect(result).toBeNull();
+        expect(warn).toHaveBeenCalled();
+        const message = warn.mock.calls.map((c) => c.join(" ")).join("\n");
+        expect(message).toMatch(/failed to load \.deloop\/config\.ts/);
+      } finally {
+        warn.mockRestore();
+      }
+    });
+
+    it("returns null and warns when the config throws at import time", async () => {
+      root = makeRoot();
+      mkdirSync(join(root, ".deloop"), { recursive: true });
+      writeFileSync(
+        join(root, ".deloop/config.ts"),
+        `throw new Error("boom-from-user-config");\nexport default {};\n`,
+        "utf8",
+      );
+
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      try {
+        const result = await loadDeloopConfig(root);
+        expect(result).toBeNull();
+        expect(warn).toHaveBeenCalled();
+        const message = warn.mock.calls.map((c) => c.join(" ")).join("\n");
+        expect(message).toMatch(/boom-from-user-config/);
+      } finally {
+        warn.mockRestore();
+      }
+    });
   });
 });
