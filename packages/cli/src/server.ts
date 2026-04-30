@@ -18,7 +18,10 @@ export async function startServer({ root, port, open }: ServerOptions): Promise<
 
   console.log(`[deloop] Starting with project root: ${root}`);
 
-  await bootstrapDeloopDir(root);
+  const created = await bootstrapDeloopDir(root);
+  if (created.length > 0) {
+    console.log(`[deloop] Initialized ${created.join(", ")}`);
+  }
 
   const vite = await createViteComponentServer(root);
 

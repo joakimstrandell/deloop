@@ -78,4 +78,34 @@ describe("bootstrapDeloopDir", () => {
     expect(readFileSync(join(root, ".deloop/config.ts"), "utf8")).toBe("// existing\n");
     expect(existsSync(join(root, ".deloop/canvas.json"))).toBe(true);
   });
+
+  it("returns paths of files created on first run", async () => {
+    root = makeRoot();
+    mkdirSync(root, { recursive: true });
+
+    const created = await bootstrapDeloopDir(root);
+
+    expect(created).toEqual([".deloop/config.ts", ".deloop/canvas.json"]);
+  });
+
+  it("returns an empty array when nothing is created", async () => {
+    root = makeRoot();
+    mkdirSync(join(root, ".deloop"), { recursive: true });
+    writeFileSync(join(root, ".deloop/config.ts"), "// existing\n");
+    writeFileSync(join(root, ".deloop/canvas.json"), "{}");
+
+    const created = await bootstrapDeloopDir(root);
+
+    expect(created).toEqual([]);
+  });
+
+  it("returns only the path of the file actually created", async () => {
+    root = makeRoot();
+    mkdirSync(join(root, ".deloop"), { recursive: true });
+    writeFileSync(join(root, ".deloop/canvas.json"), "{}");
+
+    const created = await bootstrapDeloopDir(root);
+
+    expect(created).toEqual([".deloop/config.ts"]);
+  });
 });
