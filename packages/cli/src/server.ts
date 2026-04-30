@@ -62,4 +62,29 @@ export async function startServer({ root, port, open }: ServerOptions): Promise<
       exec(cmd);
     }
   });
+
+  // Release chokidar watchers (and other long-lived handles) on shutdown.
+  // Without this, the registry's FSWatcher leaks file handles whenever the
+  // CLI is restarted in-process (test harness, future hot-reload paths).
+  let shuttingDown = false;
+  const shutdown = async (): Promise<void> => {
+    if (shuttingDown) return;
+    shuttingDown = true;
+    try {
+      await registry.close();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.warn(`[deloop] error closing component registry: ${message}`);
+    }
+  };
+
+  process.once("SIGINT", () => {
+    void shutdown().finally(() => process.exit(0));
+  });
+  process.once("SIGTERM", () => {
+    void shutdown().finally(() => process.exit(0));
+  });
+  httpServer.on("close", () => {
+    void shutdown();
+  });
 }

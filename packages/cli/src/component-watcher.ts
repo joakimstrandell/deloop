@@ -42,9 +42,20 @@ export async function createComponentRegistry(
   let cache: ComponentInfo[] | null = null;
   let pending: Promise<ComponentInfo[]> | null = null;
 
+  // Generation counter — bumped on every `invalidate` event. A `refresh()`
+  // call snapshots the generation it started under and only commits its
+  // result to the cache if the generation hasn't moved since. This drops
+  // results from refreshes that were superseded by an invalidate event
+  // firing mid-flight, which would otherwise let stale data overwrite a
+  // freshly-invalidated cache.
+  let generation = 0;
+
   async function refresh(): Promise<ComponentInfo[]> {
+    const startedAt = generation;
     const result = await discoverComponents(projectRoot, options);
-    cache = result;
+    if (startedAt === generation) {
+      cache = result;
+    }
     return result;
   }
 
@@ -64,6 +75,7 @@ export async function createComponentRegistry(
   if (watcher) {
     const invalidate = (): void => {
       cache = null;
+      generation++;
     };
     watcher.on("add", invalidate);
     watcher.on("unlink", invalidate);
