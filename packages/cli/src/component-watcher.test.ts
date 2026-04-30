@@ -16,6 +16,56 @@ const discoveryHooks = vi.hoisted(() => ({
   callCount: 0,
 }));
 
+// Hoisted controllable chokidar mock. By default the mock delegates to the
+// real chokidar so existing tests continue to exercise the actual watcher.
+// When `controlled` is set, `chokidar.watch` returns a synthetic watcher
+// that records its event handlers; `emit(event)` fires them synchronously
+// from a test, removing the dependency on real FS-event timing (which is
+// flaky on Linux CI runners).
+interface ControlledWatcher {
+  on(event: string, handler: (path: string) => void): ControlledWatcher;
+  close(): Promise<void>;
+  emit(event: "add" | "unlink" | "change", path?: string): void;
+}
+const chokidarHooks = vi.hoisted(() => ({
+  controlled: false,
+  lastWatcher: null as ControlledWatcher | null,
+}));
+
+vi.mock("chokidar", async () => {
+  const actual = await vi.importActual<typeof import("chokidar")>("chokidar");
+  return {
+    ...actual,
+    default: {
+      ...actual.default,
+      watch: (paths: string | string[], options?: unknown) => {
+        if (!chokidarHooks.controlled) {
+          return actual.default.watch(paths, options as Parameters<typeof actual.default.watch>[1]);
+        }
+        const handlers = new Map<string, Array<(path: string) => void>>();
+        const watcher: ControlledWatcher = {
+          on(event, handler) {
+            const list = handlers.get(event) ?? [];
+            list.push(handler);
+            handlers.set(event, list);
+            return watcher;
+          },
+          async close() {
+            handlers.clear();
+          },
+          emit(event, path = "") {
+            const list = handlers.get(event);
+            if (!list) return;
+            for (const h of list) h(path);
+          },
+        };
+        chokidarHooks.lastWatcher = watcher;
+        return watcher;
+      },
+    },
+  };
+});
+
 vi.mock("./component-discovery.js", async () => {
   const actual = await vi.importActual<typeof import("./component-discovery.js")>(
     "./component-discovery.js",
@@ -56,6 +106,9 @@ beforeEach(() => {
   discoveryHooks.callCount = 0;
   discoveryHooks.override = null;
   discoveryHooks.delay = null;
+  // Default to real chokidar; only the race test arms the controlled mode.
+  chokidarHooks.controlled = false;
+  chokidarHooks.lastWatcher = null;
 });
 
 afterEach(async () => {
@@ -101,6 +154,11 @@ describe("createComponentRegistry", () => {
   });
 
   it("re-discovers components when a new file is added", async () => {
+    // Use the controllable chokidar mock so we can fire the `add` event
+    // synchronously without depending on real FS-event latency, which is
+    // flaky on Linux CI (and even occasionally on macOS).
+    chokidarHooks.controlled = true;
+
     root = makeRoot();
     mkdirSync(join(root, "src/components"), { recursive: true });
     writeFileSync(
@@ -117,15 +175,15 @@ describe("createComponentRegistry", () => {
       join(root, "src/components/Card.tsx"),
       "export default function Card(){ return null; }",
     );
+    chokidarHooks.lastWatcher?.emit("add", join(root, "src/components/Card.tsx"));
 
-    const list = await waitFor(async () => {
-      const items = await registry.list();
-      return items.length === 2 ? items : null;
-    });
+    const list = await registry.list();
     expect(list.map((c) => c.name).sort()).toEqual(["Button", "Card"]);
   });
 
   it("re-discovers components when a file is removed", async () => {
+    chokidarHooks.controlled = true;
+
     root = makeRoot();
     mkdirSync(join(root, "src/components"), { recursive: true });
     writeFileSync(
@@ -143,11 +201,9 @@ describe("createComponentRegistry", () => {
     expect((await registry.list()).length).toBe(2);
 
     unlinkSync(join(root, "src/components/Card.tsx"));
+    chokidarHooks.lastWatcher?.emit("unlink", join(root, "src/components/Card.tsx"));
 
-    const list = await waitFor(async () => {
-      const items = await registry.list();
-      return items.length === 1 ? items : null;
-    });
+    const list = await registry.list();
     expect(list.map((c) => c.name)).toEqual(["Button"]);
   });
 
@@ -175,6 +231,14 @@ describe("createComponentRegistry", () => {
     // Race scenario: refresh() resolves with stale data after a watcher event
     // invalidates the cache. The generation guard should drop the stale result
     // so the next list() re-discovers from disk instead of returning old data.
+    //
+    // We use the controllable chokidar mock here so the `add` event fires
+    // synchronously when we want it to — relying on real chokidar's FS-event
+    // latency was flaky on Linux CI runners (the 800ms sleep wasn't always
+    // enough for the watcher to observe the write before we released the
+    // stalled refresh, which let the stale snapshot land in cache).
+    chokidarHooks.controlled = true;
+
     root = makeRoot();
     mkdirSync(join(root, "src/components"), { recursive: true });
     writeFileSync(
@@ -215,17 +279,19 @@ describe("createComponentRegistry", () => {
     // Wait for the stalled call to enter its post-snapshot wait.
     await waitFor(() => (discoveryHooks.callCount >= 1 ? true : null));
 
-    // Now add a real file. The stalled refresh #1 will resolve with the
-    // synthetic pre-Card snapshot; the watcher fires `invalidate`, bumping
-    // the generation counter mid-flight.
+    // Now add a real file on disk so the post-invalidate refresh (call #2)
+    // sees both Button and Card via the real discoverComponents fallback.
     writeFileSync(
       join(root, "src/components/Card.tsx"),
       "export default function Card(){ return null; }",
     );
 
-    // Give chokidar generous time to observe the add and fire `invalidate`.
-    // On macOS the typical latency is <200ms, but CI can be slower.
-    await new Promise((r) => setTimeout(r, 800));
+    // Fire the `add` event synchronously through the controllable mock.
+    // This calls `invalidate()` directly, bumping the generation counter
+    // mid-flight while refresh #1 is still stalled — the production race
+    // we want to prove is handled correctly.
+    expect(chokidarHooks.lastWatcher).not.toBeNull();
+    chokidarHooks.lastWatcher?.emit("add", join(root, "src/components/Card.tsx"));
 
     // Release the stalled first refresh — it returns the synthetic
     // ["Button"] snapshot. Generation has moved (invalidate ran), so the
@@ -242,8 +308,8 @@ describe("createComponentRegistry", () => {
     expect(fresh.map((c) => c.name).sort()).toEqual(["Button", "Card"]);
 
     // Two refresh calls expected: the stalled one and the one triggered
-    // after invalidate. If only 1 happened, chokidar didn't fire (would
-    // make this test inconclusive); fail loudly so it's not silently
+    // after invalidate. If only 1 happened, the invalidate path didn't run
+    // (would make this test inconclusive); fail loudly so it's not silently
     // green when the race protection regresses.
     expect(discoveryHooks.callCount).toBeGreaterThanOrEqual(2);
   });
