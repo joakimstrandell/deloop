@@ -3,7 +3,8 @@ import { exec } from "node:child_process";
 import express from "express";
 import { WebSocketServer } from "ws";
 import { createViteComponentServer } from "./vite-component-server.js";
-import { discoverComponents } from "./component-discovery.js";
+import { createComponentRegistry } from "./component-watcher.js";
+import { loadDeloopConfig } from "./config-loader.js";
 import { bootstrapDeloopDir } from "./bootstrap.js";
 
 export interface ServerOptions {
@@ -23,11 +24,17 @@ export async function startServer({ root, port, open }: ServerOptions): Promise<
     console.log(`[deloop] Initialized ${created.join(", ")}`);
   }
 
+  const config = (await loadDeloopConfig(root)) ?? {};
+  const registry = await createComponentRegistry(
+    root,
+    config.components !== undefined ? { components: config.components } : {},
+  );
+
   const vite = await createViteComponentServer(root);
 
   // REST API
   app.get("/api/components", async (_req, res) => {
-    const components = await discoverComponents(root);
+    const components = await registry.list();
     res.json(components);
   });
 
