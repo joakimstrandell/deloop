@@ -1,4 +1,8 @@
 import { defineConfig, devices } from "@playwright/test";
+import { fileURLToPath } from "node:url";
+import { dirname, resolve } from "node:path";
+
+const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
 export default defineConfig({
   testDir: "./tests",
@@ -21,6 +25,7 @@ export default defineConfig({
     // tsx is used to run TypeScript directly in development.
     command:
       "node node_modules/tsx/dist/cli.mjs packages/cli/src/index.ts --root packages/sample-app --port 4242 --no-open",
+    cwd: repoRoot,
     url: "http://localhost:4242",
     reuseExistingServer: !process.env["CI"],
     timeout: 30_000,
