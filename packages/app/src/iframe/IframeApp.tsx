@@ -62,7 +62,9 @@ function reducer(state: State, action: Action): State {
 }
 
 function postToShell(msg: IframeToShellMessage) {
-  window.parent.postMessage(msg, "*");
+  // Same-origin shell ↔ iframe per ADR-0001; pin targetOrigin to the
+  // iframe's own origin (which equals the shell's) instead of "*".
+  window.parent.postMessage(msg, window.location.origin);
 }
 
 export function IframeApp() {
@@ -70,6 +72,10 @@ export function IframeApp() {
 
   useEffect(() => {
     async function handleMessage(event: MessageEvent<unknown>) {
+      // Only accept messages from our parent shell document. Mirrors the
+      // shell-side guard at App.tsx and prevents accidental processing of
+      // messages from nested iframes, browser extensions, or window openers.
+      if (event.source !== window.parent) return;
       const msg = parseShellToIframeMessage(event.data);
       if (!msg) return;
 

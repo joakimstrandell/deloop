@@ -40,8 +40,10 @@ export function App() {
         case "iframeReady":
           setIframeReady(true);
           // Flush any messages queued while the iframe was hydrating.
+          // Iframe is same-origin per ADR-0001, so we pin targetOrigin
+          // rather than using the permissive "*".
           for (const queued of queuedMessages.current) {
-            iframeRef.current?.contentWindow?.postMessage(queued, "*");
+            iframeRef.current?.contentWindow?.postMessage(queued, window.location.origin);
           }
           queuedMessages.current = [];
           break;
@@ -62,7 +64,10 @@ export function App() {
 
   function send(msg: ShellToIframeMessage) {
     if (iframeReady) {
-      iframeRef.current?.contentWindow?.postMessage(msg, "*");
+      // Same-origin shell ↔ iframe per ADR-0001; pin targetOrigin to the
+      // shell's own origin to keep the channel from leaking if the iframe
+      // is ever navigated cross-origin (intentionally or otherwise).
+      iframeRef.current?.contentWindow?.postMessage(msg, window.location.origin);
     } else {
       queuedMessages.current.push(msg);
     }

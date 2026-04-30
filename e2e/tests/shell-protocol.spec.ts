@@ -37,6 +37,7 @@ test.describe("AWK-10 shell + protocol", () => {
 
     // Send a synthetic `mount` directly (no sidebar click) — this isolates
     // the shell→iframe protocol from the component discovery pipeline.
+    // Pin targetOrigin to window.location.origin to mirror production sends.
     await page.evaluate(() => {
       const iframe = document.querySelector<HTMLIFrameElement>("iframe#canvas");
       iframe?.contentWindow?.postMessage(
@@ -46,7 +47,7 @@ test.describe("AWK-10 shell + protocol", () => {
           componentPath: "about:blank-not-a-real-module",
           props: {},
         },
-        "*",
+        window.location.origin,
       );
     });
 
@@ -56,6 +57,56 @@ test.describe("AWK-10 shell + protocol", () => {
     await expect(canvas.locator('[data-card-id="placeholder-card"]')).toBeVisible({
       timeout: 5_000,
     });
+  });
+
+  test("iframe rejects mount messages whose source is not window.parent", async ({ page }) => {
+    // Defense-in-depth check: the iframe-side handler must mirror the shell's
+    // event.source guard so messages from nested iframes, browser extensions,
+    // or window.open openers don't get processed even if they happen to match
+    // the protocol shape. We post the message from *inside* the iframe
+    // (window.postMessage on the iframe's own window) so event.source equals
+    // the iframe's own window — which !== window.parent — and the guard must
+    // drop the payload.
+    await page.goto("/");
+    await expect(page.getByText("Canvas ready")).toBeVisible({ timeout: 10_000 });
+
+    const canvas = page.frameLocator("iframe#canvas");
+
+    // Run inside the iframe document so event.source === window (iframe's
+    // own window), which is NOT window.parent from the handler's view.
+    await canvas.locator("body").evaluate(() => {
+      window.postMessage(
+        {
+          type: "mount",
+          cardId: "should-not-appear",
+          componentPath: "about:blank",
+          props: {},
+        },
+        window.location.origin,
+      );
+    });
+
+    // The card should never appear because the message originated from the
+    // iframe itself (re-posting to itself), not from the parent shell.
+    await expect(canvas.locator('[data-card-id="should-not-appear"]')).toHaveCount(0, {
+      timeout: 1_500,
+    });
+
+    // Sanity check: a legitimate mount from the shell still works after the
+    // rejected one, proving the handler is still alive.
+    await page.evaluate(() => {
+      const iframe = document.querySelector<HTMLIFrameElement>("iframe#canvas");
+      iframe?.contentWindow?.postMessage(
+        {
+          type: "mount",
+          cardId: "legit-card",
+          componentPath: "about:blank",
+          props: {},
+        },
+        window.location.origin,
+      );
+    });
+    await expect(canvas.locator('[data-card-id="legit-card"]')).toBeVisible({ timeout: 5_000 });
   });
 
   test("tool chrome styles do not leak into the iframe", async ({ page }) => {
