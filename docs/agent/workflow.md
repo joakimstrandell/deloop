@@ -12,9 +12,13 @@ Define the default implementation workflow for Deloop. Linear is the source of t
 4. Implement only that issue's scope.
 5. Run required checks from `docs/agent/testing.md`.
 6. Open a PR linked to the issue.
-7. Merge on GitHub, then sync local `main`.
+7. Merge on GitHub, then sync local `main`. After `gh pr merge --delete-branch`, also delete the local branch that tracked the now-deleted remote (`git branch -d <branch>`) — `gh` skips this when a worktree still holds the branch.
 
 Use one PR per issue by default. Split further only when a single issue is too large to review safely.
+
+### Direct-to-main exception
+
+Trivial unblocking infra fixes (e.g. CI configuration, dependency-pin updates, docs-only edits) may be committed directly to `main` and pushed, but only when the user has explicitly authorized it for the specific change. The Linear issue requirement still applies for code changes — file the issue first, reference it in the commit message, and mark it Done after the push lands. Docs-only commits to agent playbooks may skip the Linear issue, matching the existing precedent (`docs(workflow): ...`, `docs(review): ...`). Use sparingly; default remains branch + PR.
 
 ## Kickoff Decision Gate (required before implementation)
 

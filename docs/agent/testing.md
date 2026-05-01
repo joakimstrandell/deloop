@@ -51,6 +51,12 @@ Each Linear issue should include:
 - Assert visible behavior, not implementation internals.
 - Prefer stable selectors and user-facing text.
 
+## Test Determinism
+
+Tests that observe real OS-level events — filesystem watchers (chokidar), process signals, real network timing, real timers — must be made deterministic via mocks. Do not gate assertions on a `setTimeout` long enough to "probably" allow the event to arrive: CI runners are slower than local machines, and the resulting flakes hide real regressions.
+
+When a test passes locally but fails in CI with a timing-sensitive symptom, treat the test instrumentation as broken, not the implementation under test. Diagnose the race and fix it (mock the event source, or wait on a deterministic signal); do not retry or extend the timeout.
+
 ## Definition of Done (Required Checks)
 
 Before marking an issue Done:

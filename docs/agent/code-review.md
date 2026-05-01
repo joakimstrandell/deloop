@@ -110,3 +110,8 @@ Use this structure in PR review comments:
 - Prefer precise, actionable suggestions over broad refactor asks.
 - If scope is wrong, recommend updating Linear first.
 - If new work surfaced in review is substantial, recommend creating a new Linear issue instead of expanding the current PR scope.
+- Out-of-scope findings (must-fix or should-fix items the implementer skipped as out of AC, or items that emerge during co-review) must be captured in Linear before the review is considered complete: as a comment on the consuming issue when one exists, or as a new low-priority issue otherwise. Reference the originating PR in each comment/issue so context survives.
+
+## PR Comment Conventions
+
+- Do not @-mention humans by GitHub handle unless the handle was explicitly provided by the user — guessed handles ping strangers and force a comment edit. Refer to the actor by role ("co-review pass", "implementation agent", "review agent") instead of using `@<guess>`.
