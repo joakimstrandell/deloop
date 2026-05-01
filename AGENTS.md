@@ -29,6 +29,7 @@ See PRD: `~/Downloads/PRD-Deloop-v0.8.md`
 - Branch naming follows `<type>/awk-123-short-topic` from `docs/agent/workflow.md`.
 - Isolated worktrees should be cleaned up after implementation/review handoff.
 - Run branch hygiene (`git fetch --prune` + merged branch cleanup) before new kickoff.
+- Playbook drift check: when the same friction surfaces twice across sessions (an undocumented exception you keep making, a process step you keep skipping, a rule the doc doesn't mention), propose a playbook update before the next kickoff. Apply per the docs-only path in `docs/agent/workflow.md`.
 
 ## Agent Playbooks
 
