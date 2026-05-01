@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "cd /Users/joakimstrandell/Projects/deloop && pnpm --recursive run check 2>&1 | tail -6"
+            "command": "pnpm --recursive run check 2>&1 | tail -6"
           }
         ]
       }
