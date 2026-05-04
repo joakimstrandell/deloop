@@ -10,10 +10,10 @@
 import { test, expect } from "@playwright/test";
 
 test.describe("component list", () => {
-  test("shows Button from sample-app", async ({ page }) => {
+  test("shows Button from @deloop/ui", async ({ page }) => {
     await page.goto("/");
 
-    // The sidebar discovers components from packages/sample-app/src/components/
+    // The sidebar discovers components from packages/ui/src/components/
     await expect(page.getByText("Button")).toBeVisible({ timeout: 10_000 });
   });
 });

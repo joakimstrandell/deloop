@@ -21,10 +21,10 @@ export default defineConfig({
     },
   ],
   webServer: {
-    // Run Deloop CLI pointed at the sample-app from the repo root.
-    // tsx is used to run TypeScript directly in development.
+    // Run Deloop CLI pointed at packages/ui (Deloop dogfoods its own design
+    // system) from the repo root. tsx runs TypeScript directly in development.
     command:
-      "node node_modules/tsx/dist/cli.mjs packages/cli/src/index.ts --root packages/sample-app --port 4242 --no-open",
+      "node node_modules/tsx/dist/cli.mjs packages/cli/src/index.ts --root packages/ui --port 4242 --no-open",
     cwd: repoRoot,
     url: "http://localhost:4242",
     reuseExistingServer: !process.env["CI"],

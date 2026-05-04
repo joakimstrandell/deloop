@@ -34,9 +34,15 @@ export function parseShellToIframeMessage(input: unknown): ShellToIframeMessage 
 
   switch (input["type"]) {
     case "mount": {
-      const { cardId, componentPath, props } = input;
-      if (typeof cardId === "string" && typeof componentPath === "string" && isPlainProps(props)) {
-        return { type: "mount", cardId, componentPath, props };
+      const { cardId, componentPath, componentName, props } = input;
+      if (
+        typeof cardId === "string" &&
+        typeof componentPath === "string" &&
+        typeof componentName === "string" &&
+        componentName.length > 0 &&
+        isPlainProps(props)
+      ) {
+        return { type: "mount", cardId, componentPath, componentName, props };
       }
       return null;
     }
