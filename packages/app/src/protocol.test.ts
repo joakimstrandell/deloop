@@ -18,6 +18,7 @@ describe("parseShellToIframeMessage", () => {
       type: "mount",
       cardId: "card-1",
       componentPath: "/@fs/abs/Button.tsx",
+      componentName: "Button",
       props: { label: "Hello" },
     };
     expect(parseShellToIframeMessage(msg)).toEqual(msg);
@@ -50,7 +51,46 @@ describe("parseShellToIframeMessage", () => {
 
   it("rejects mount missing required fields", () => {
     expect(parseShellToIframeMessage({ type: "mount", cardId: "x" })).toBeNull();
-    expect(parseShellToIframeMessage({ type: "mount", componentPath: "/x", props: {} })).toBeNull();
+    expect(
+      parseShellToIframeMessage({
+        type: "mount",
+        componentPath: "/x",
+        componentName: "Button",
+        props: {},
+      }),
+    ).toBeNull();
+  });
+
+  it("rejects mount missing componentName", () => {
+    expect(
+      parseShellToIframeMessage({
+        type: "mount",
+        cardId: "x",
+        componentPath: "/x",
+        props: {},
+      }),
+    ).toBeNull();
+  });
+
+  it("rejects mount when componentName is the wrong type or empty", () => {
+    expect(
+      parseShellToIframeMessage({
+        type: "mount",
+        cardId: "x",
+        componentPath: "/x",
+        componentName: 42,
+        props: {},
+      }),
+    ).toBeNull();
+    expect(
+      parseShellToIframeMessage({
+        type: "mount",
+        cardId: "x",
+        componentPath: "/x",
+        componentName: "",
+        props: {},
+      }),
+    ).toBeNull();
   });
 
   it("rejects iframe→shell messages on the shell→iframe parser", () => {
@@ -70,6 +110,7 @@ describe("parseShellToIframeMessage", () => {
         type: "mount",
         cardId: "x",
         componentPath: "/x",
+        componentName: "Button",
         props: ["not", "an", "object"],
       }),
     ).toBeNull();

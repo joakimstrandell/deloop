@@ -13,21 +13,23 @@ This repository is currently set up for local development usage. The CLI package
 - Node.js `>=24`
 - `pnpm`
 
-### Start Deloop against the sample app
+### Start Deloop against the bundled `@deloop/ui` design system
+
+Deloop dogfoods its own components — this is also the canonical local example.
 
 ```bash
 pnpm install
-pnpm --filter @deloop/sample-app dev
+pnpm --filter @deloop/cli dev --root "$PWD/packages/ui" --port 4242 --no-open
 ```
 
-Then open `http://localhost:4242` if it does not open automatically.
+Then open `http://localhost:4242`.
 
 ### Run Deloop against another local project
 
 From this repo, run:
 
 ```bash
-pnpm --filter @deloop/cli dev -- --root /absolute/path/to/your/project --port 4242 --no-open
+pnpm --filter @deloop/cli dev --root /absolute/path/to/your/project --port 4242 --no-open
 ```
 
 CLI options:

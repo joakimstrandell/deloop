@@ -2,8 +2,8 @@
  * E2E coverage for the .deloop/ bootstrap workflow (AWK-9).
  *
  * The Playwright webServer (see playwright.config.ts) starts the Deloop CLI
- * pointed at packages/sample-app. After the server is up, the CLI's bootstrap
- * step must have created .deloop/config.ts and .deloop/canvas.json there.
+ * pointed at packages/ui. After the server is up, the CLI's bootstrap step
+ * must have created .deloop/config.ts and .deloop/canvas.json there.
  *
  * Idempotency / no-overwrite behavior is covered by unit tests in
  * packages/cli/src/bootstrap.test.ts; this spec verifies the artifacts are
@@ -15,7 +15,7 @@ import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
-const deloopDir = resolve(repoRoot, "packages/sample-app/.deloop");
+const deloopDir = resolve(repoRoot, "packages/ui/.deloop");
 
 test.describe("CLI bootstrap", () => {
   test("scaffolds .deloop/config.ts with a default export", async ({ page }) => {

@@ -43,6 +43,13 @@ export type ShellToIframeMessage =
        * a Vite `/@fs/<absolute-path>` URL; in production it's a regular URL.
        */
       componentPath: string;
+      /**
+       * Export name to pull from the imported module. The iframe resolves the
+       * renderable as `mod[componentName] ?? mod.default`, which lets a
+       * component file ship a named export (e.g. `export function Button`)
+       * without also adding `export default`.
+       */
+      componentName: string;
       /** Initial props passed to the component on first render. */
       props: Record<string, unknown>;
     }

@@ -82,6 +82,10 @@ export function App() {
       // Vite's /@fs/ prefix allows the browser to import absolute filesystem
       // paths that are within server.fs.allow. See ADR-0002.
       componentPath: `/@fs${component.path}`,
+      // The iframe resolves `mod[componentName] ?? mod.default`, so a
+      // named-only export (e.g. `export function Button`) renders without
+      // requiring `export default`.
+      componentName: component.name,
       props: {},
     });
   }

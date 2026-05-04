@@ -6,6 +6,8 @@ interface MountedCard {
   cardId: string;
   /** Vite /@fs/ URL or other module specifier for the component module. */
   componentPath: string;
+  /** Export name resolved against the imported module (see MOUNT). */
+  componentName: string;
   props: Record<string, unknown>;
   pseudoState: PseudoState;
   Component: ComponentType<Record<string, unknown>> | null;
@@ -15,7 +17,13 @@ interface MountedCard {
 type State = Map<string, MountedCard>;
 
 type Action =
-  | { type: "MOUNT"; cardId: string; componentPath: string; props: Record<string, unknown> }
+  | {
+      type: "MOUNT";
+      cardId: string;
+      componentPath: string;
+      componentName: string;
+      props: Record<string, unknown>;
+    }
   | { type: "RESOLVED"; cardId: string; Component: ComponentType<Record<string, unknown>> }
   | { type: "FAILED"; cardId: string; error: string }
   | { type: "UNMOUNT"; cardId: string }
@@ -29,6 +37,7 @@ function reducer(state: State, action: Action): State {
       next.set(action.cardId, {
         cardId: action.cardId,
         componentPath: action.componentPath,
+        componentName: action.componentName,
         props: action.props,
         pseudoState: "default",
         Component: null,
@@ -85,6 +94,7 @@ export function IframeApp() {
             type: "MOUNT",
             cardId: msg.cardId,
             componentPath: msg.componentPath,
+            componentName: msg.componentName,
             props: msg.props,
           });
           // Resolve the component module asynchronously. The placeholder
@@ -96,16 +106,21 @@ export function IframeApp() {
               string,
               unknown
             >;
-            const Component = mod["default"];
+            // Resolution rule: prefer the named export matching the entry's
+            // name, fall back to default. This lets components ship as
+            // `export function Button` without also requiring a default.
+            const Component = mod[msg.componentName] ?? mod["default"];
             // Plain function components are functions; React.forwardRef,
             // React.memo, and React.lazy wrap them in objects (with a
             // $$typeof symbol). Either shape is renderable; anything else
-            // (string, number, null) is not a valid default export.
+            // (string, number, null) is not a valid component export.
             if (
               Component == null ||
               (typeof Component !== "function" && typeof Component !== "object")
             ) {
-              throw new Error(`${msg.componentPath} does not export a default React component`);
+              throw new Error(
+                `${msg.componentPath} has neither a named export "${msg.componentName}" nor a default export`,
+              );
             }
             dispatch({
               type: "RESOLVED",

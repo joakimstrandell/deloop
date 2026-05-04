@@ -314,3 +314,216 @@ describe("createComponentRegistry", () => {
     expect(discoveryHooks.callCount).toBeGreaterThanOrEqual(2);
   });
 });
+
+describe("createComponentRegistry — subscribe (SSE source)", () => {
+  beforeEach(() => {
+    chokidarHooks.controlled = true;
+  });
+
+  it("publishes a discovery event on add, debounced by 100ms", async () => {
+    root = makeRoot();
+    mkdirSync(join(root, "src/components"), { recursive: true });
+    writeFileSync(
+      join(root, "src/components/Button.tsx"),
+      "export default function Button(){ return null; }",
+    );
+
+    const registry = await createComponentRegistry(root);
+    cleanup = () => registry.close();
+
+    const events: ComponentInfo[][] = [];
+    registry.subscribe((components) => events.push(components));
+
+    writeFileSync(
+      join(root, "src/components/Card.tsx"),
+      "export default function Card(){ return null; }",
+    );
+    chokidarHooks.lastWatcher?.emit("add", join(root, "src/components/Card.tsx"));
+
+    // No debounce-flush yet → no event delivered.
+    await new Promise((r) => setTimeout(r, 60));
+    expect(events).toHaveLength(0);
+
+    // Past the 100ms debounce + microtask drain for the refresh.
+    const [received] = await waitFor(() => (events.length >= 1 ? events : null));
+    expect(received?.map((c) => c.name).sort()).toEqual(["Button", "Card"]);
+  });
+
+  it("publishes a discovery event on unlink", async () => {
+    root = makeRoot();
+    mkdirSync(join(root, "src/components"), { recursive: true });
+    writeFileSync(
+      join(root, "src/components/Button.tsx"),
+      "export default function Button(){ return null; }",
+    );
+    writeFileSync(
+      join(root, "src/components/Card.tsx"),
+      "export default function Card(){ return null; }",
+    );
+
+    const registry = await createComponentRegistry(root);
+    cleanup = () => registry.close();
+
+    const events: ComponentInfo[][] = [];
+    registry.subscribe((components) => events.push(components));
+
+    unlinkSync(join(root, "src/components/Card.tsx"));
+    chokidarHooks.lastWatcher?.emit("unlink", join(root, "src/components/Card.tsx"));
+
+    const [received] = await waitFor(() => (events.length >= 1 ? events : null));
+    expect(received?.map((c) => c.name)).toEqual(["Button"]);
+  });
+
+  it("does NOT publish on change events (Vite HMR covers content edits)", async () => {
+    root = makeRoot();
+    mkdirSync(join(root, "src/components"), { recursive: true });
+    writeFileSync(
+      join(root, "src/components/Button.tsx"),
+      "export default function Button(){ return null; }",
+    );
+
+    const registry = await createComponentRegistry(root);
+    cleanup = () => registry.close();
+
+    const events: ComponentInfo[][] = [];
+    registry.subscribe((components) => events.push(components));
+
+    chokidarHooks.lastWatcher?.emit("change", join(root, "src/components/Button.tsx"));
+
+    // Wait comfortably past the debounce window — the change handler must
+    // not have scheduled any publish.
+    await new Promise((r) => setTimeout(r, 250));
+    expect(events).toHaveLength(0);
+  });
+
+  it("coalesces a burst of add events into a single push", async () => {
+    root = makeRoot();
+    mkdirSync(join(root, "src/components"), { recursive: true });
+    writeFileSync(
+      join(root, "src/components/A.tsx"),
+      "export default function A(){ return null; }",
+    );
+
+    const registry = await createComponentRegistry(root);
+    cleanup = () => registry.close();
+
+    const events: ComponentInfo[][] = [];
+    registry.subscribe((components) => events.push(components));
+
+    // Simulate a `git checkout`-style burst within the debounce window —
+    // chokidar fires one event per file, but the registry's debounce should
+    // collapse them into a single push.
+    for (const name of ["B", "C", "D", "E"]) {
+      writeFileSync(
+        join(root, `src/components/${name}.tsx`),
+        `export default function ${name}(){ return null; }`,
+      );
+      chokidarHooks.lastWatcher?.emit("add", join(root, `src/components/${name}.tsx`));
+      await new Promise((r) => setTimeout(r, 20));
+    }
+
+    const [received] = await waitFor(() => (events.length >= 1 ? events : null));
+
+    // Give the publisher generous time to fire any spurious extra events
+    // we'd want to catch as a regression.
+    await new Promise((r) => setTimeout(r, 200));
+
+    expect(events).toHaveLength(1);
+    expect(received?.map((c) => c.name).sort()).toEqual(["A", "B", "C", "D", "E"]);
+  });
+
+  it("does not deliver superseded data to subscribers", async () => {
+    // Mirrors the cache-side supersede test, but on the publisher path.
+    // If the publisher's refresh resolves under a generation that has
+    // already moved (because an `add` fired while it was awaiting disk),
+    // the publisher must NOT notify subscribers with that stale snapshot —
+    // it must re-refresh until the result observes the latest generation.
+    chokidarHooks.controlled = true;
+
+    root = makeRoot();
+    mkdirSync(join(root, "src/components"), { recursive: true });
+    writeFileSync(
+      join(root, "src/components/Button.tsx"),
+      "export default function Button(){ return null; }",
+    );
+
+    let resolveStalledCall: () => void = () => undefined;
+    const stallPromise = new Promise<void>((r) => {
+      resolveStalledCall = r;
+    });
+
+    // Force a slow first refresh by stalling discovery call #1. Calls #2+
+    // run normally and observe the on-disk state including the post-stall
+    // file added below.
+    discoveryHooks.delay = async (callIndex) => {
+      if (callIndex === 1) await stallPromise;
+    };
+
+    const registry = await createComponentRegistry(root);
+    cleanup = () => registry.close();
+
+    const events: ComponentInfo[][] = [];
+    registry.subscribe((components) => events.push(components));
+
+    // Trigger an initial refresh by reading list() — this kicks call #1,
+    // which will stall in the mock until we release it.
+    const inFlight = registry.list();
+    await waitFor(() => (discoveryHooks.callCount >= 1 ? true : null));
+
+    // Now fire a chokidar add — this happens while refresh #1 is stalled.
+    // The add file appears on disk so call #2 (post-invalidate) sees it.
+    writeFileSync(
+      join(root, "src/components/Card.tsx"),
+      "export default function Card(){ return null; }",
+    );
+    chokidarHooks.lastWatcher?.emit("add", join(root, "src/components/Card.tsx"));
+
+    // Release the stalled refresh #1 — its result is the pre-add snapshot
+    // (just Button). If the publisher path naively dispatched this result,
+    // subscribers would receive ["Button"] instead of ["Button", "Card"].
+    resolveStalledCall();
+    await inFlight;
+
+    // Publisher should re-refresh after seeing generation moved, then
+    // deliver the post-add list. Wait past the 100ms debounce + the
+    // re-refresh await.
+    const [received] = await waitFor(() => (events.length >= 1 ? events : null));
+
+    expect(received?.map((c) => c.name).sort()).toEqual(["Button", "Card"]);
+    // Belt-and-braces: ensure no stale notification slipped through.
+    expect(events.some((batch) => batch.map((c) => c.name).join(",") === "Button")).toBe(false);
+  });
+
+  it("unsubscribe stops further notifications", async () => {
+    root = makeRoot();
+    mkdirSync(join(root, "src/components"), { recursive: true });
+    writeFileSync(
+      join(root, "src/components/Button.tsx"),
+      "export default function Button(){ return null; }",
+    );
+
+    const registry = await createComponentRegistry(root);
+    cleanup = () => registry.close();
+
+    const events: ComponentInfo[][] = [];
+    const off = registry.subscribe((components) => events.push(components));
+
+    writeFileSync(
+      join(root, "src/components/Card.tsx"),
+      "export default function Card(){ return null; }",
+    );
+    chokidarHooks.lastWatcher?.emit("add", join(root, "src/components/Card.tsx"));
+    await waitFor(() => (events.length >= 1 ? true : null));
+
+    off();
+
+    writeFileSync(
+      join(root, "src/components/Dialog.tsx"),
+      "export default function Dialog(){ return null; }",
+    );
+    chokidarHooks.lastWatcher?.emit("add", join(root, "src/components/Dialog.tsx"));
+    await new Promise((r) => setTimeout(r, 250));
+
+    expect(events).toHaveLength(1);
+  });
+});
