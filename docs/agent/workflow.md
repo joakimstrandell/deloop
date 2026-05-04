@@ -2,108 +2,86 @@
 
 ## Purpose
 
-Define the default implementation workflow for Deloop. Linear is the source of truth for what to build.
+Default implementation flow for Deloop. Linear is the source of truth for what to build. Procedural orchestration lives in skills (`/kickoff`, `/co-review`, `/resume`); this document captures the rules those skills enforce.
 
-## Default Flow (Issue -> PR -> Merge)
+## Default Flow
 
-1. Ensure there is a Linear issue (`AWK-xxx`) for the work. If none exists, create one first.
-2. Confirm issue scope and acceptance criteria are explicit before coding.
-3. Create a dedicated branch or worktree for that issue.
-4. Implement only that issue's scope.
-5. Run required checks from `docs/agent/testing.md`.
-6. Open a PR linked to the issue.
-7. Merge on GitHub, then sync local `main`. After `gh pr merge --delete-branch`, also delete the local branch that tracked the now-deleted remote (`git branch -d <branch>`) — `gh` skips this when a worktree still holds the branch.
+1. Linear issue exists (`AWK-xxx`); scope and AC are explicit.
+2. CPTO runs `/kickoff` (grill, decision gate, spawn Implementer).
+3. Implementer implements scope, runs all checks + tests locally, opens PR with structured description.
+4. `/kickoff` chains into review automatically: CPTO spawns Reviewer in the same worktree.
+5. Reviewer returns structured findings; CPTO arbitrates (accept/reject/defer); arbitrated findings posted on PR.
+6. If changes needed: cold-respawn Implementer → cycle 2 (max). Cold-respawn Reviewer to re-review.
+7. After review converges:
+   - **Manual mode**: pause for CEO co-review of worktree; CEO merges (or asks CPTO to).
+   - **Autonomous mode** (CEO opted in for this issue): CPTO verifies CI green, merges.
+8. Reflect-then-clear: write memory entries, propose playbook drift PRs if applicable, update Linear, `/clear`.
 
-Use one PR per issue by default. Split further only when a single issue is too large to review safely.
+One PR per issue. Split only if the issue is too large to review safely.
 
 ### Direct-to-main exception
 
-Trivial unblocking infra fixes (e.g. CI configuration, dependency-pin updates, docs-only edits) may be committed directly to `main` and pushed, but only when the user has explicitly authorized it for the specific change. The Linear issue requirement still applies for code changes — file the issue first, reference it in the commit message, and mark it Done after the push lands. Docs-only commits to agent playbooks may skip the Linear issue, matching the existing precedent (`docs(workflow): ...`, `docs(review): ...`). Use sparingly; default remains branch + PR.
+Trivial unblocking infra fixes (CI config, dependency-pin updates, docs-only edits) may be committed directly to `main` only when CEO explicitly authorizes the specific change. Linear issue requirement still applies for code changes (file before commit, reference in commit message). Docs-only commits to agent playbooks may skip Linear (matches existing `docs(workflow): ...`, `docs(review): ...` precedent). Default remains branch + PR.
 
-## Kickoff Decision Gate (required before implementation)
+## Linear Requirement
 
-Before starting implementation, explicitly answer:
-
-1. Which Linear issue is being implemented?
-   - If no issue ID is provided, list relevant Linear issues and ask the user to pick one.
-2. Should implementation run in parallel using a subagent?
-   - Answer must be `yes` or `no`.
-3. Where should implementation run?
-   - `isolated worktree` (recommended default), or
-   - `current/main worktree`.
-4. Which model should implementation use?
-   - explicit model, or
-   - `default`.
-
-Default behavior when user does not specify:
-
-- choose one Linear issue explicitly before coding,
-- use isolated worktree,
-- use subagent only when parallelization is useful,
-- use default model unless user requests a specific model.
-
-Before creating a new feature/review branch/worktree, run branch hygiene:
-
-1. `git fetch --prune`
-2. delete local branches already merged to `main` (excluding `main`)
-
-## Linear Requirement (always)
-
-- No implementation starts without a Linear issue.
-- This applies to new features, bug fixes, and refactors.
-- If work is identified during discussion and no issue exists yet, create the Linear issue before creating the branch.
+- No implementation without a Linear issue (features, fixes, refactors).
+- If work is identified during discussion, file the Linear issue before creating the branch.
 
 ## Branch and PR Naming
 
-- Branch format: `<type>/awk-123-short-topic`
-- Allowed branch types: `feat`, `fix`, `refactor`, `docs`, `test`, `task`
-- Example: `feat/awk-9-project-scaffolding-and-cli-entry-point`
-- PR title: `feat(scope): short intent (AWK-123)` (or `fix`, `refactor`, `docs`, `test`)
-- Branches for feature work must map to a Linear issue key in the branch name.
-- PR description must explicitly mention and link the Linear issue.
-- The linked Linear issue must also include the PR URL once the PR is opened.
-- PRs without a linked Linear issue should not be merged.
-- Commit message: Conventional Commits + issue key, for example:
-  - `feat(cli): scaffold .deloop config bootstrap (AWK-9)`
+- Branch: `<type>/awk-<n>-<topic>` (types: `feat`, `fix`, `refactor`, `docs`, `test`, `task`).
+- PR title: `feat(scope): short intent (AWK-XX)` (or matching type).
+- PR description follows the structured contract (AC mapping, decisions, test evidence, risks).
+- PR description must mention and link the Linear issue. Linear issue must include the PR URL.
+- PRs without linked Linear issues are not merged.
+- Commit messages: Conventional Commits + issue key. Example: `feat(cli): scaffold .deloop config bootstrap (AWK-9)`.
 
 ## Linear Status Lifecycle
 
-- `Backlog`: issue not started.
-- `In Progress`: implementation has started.
-- `In Review`: PR opened and awaiting review/CI.
-- `Done`: merged to main and acceptance criteria verified.
+- `Backlog` → `In Progress` (implementation started) → `In Review` (PR open) → `Done` (merged + AC verified).
+- Scope changes during implementation/review: choose either broaden current issue (small/related) or split off new issue (substantial). Decide before continuing.
 
-When implementation or PR review uncovers scope changes, discuss and choose one path before coding further:
+## Scope Control
 
-- small/related addition: broaden the current Linear issue scope, or
-- substantial/new chunk of work: create a separate Linear issue and defer/split implementation.
+- Do not implement work outside the current issue unless it blocks delivery.
+- Blockers from missing prerequisites → file a separate Linear issue.
+- Ambiguous AC → refine in Linear before implementation.
 
-## Scope Control Rules
+## PRDs
 
-- Do not implement work not captured in the current issue unless it blocks delivery.
-- If blocked by missing prerequisites, create or link a separate Linear issue.
-- Keep acceptance criteria testable. If criteria are ambiguous, refine them in Linear before implementation.
+- Multi-PRD repo: `docs/prd/`.
+- `docs/prd/foundation.md`: v0 application vision; evolves but doesn't get superseded.
+- `docs/prd/<slug>.md`: per vertical-slice / feature initiative (descriptive slug, no version suffix).
+- `docs/prd/README.md`: light index of active PRDs and their status.
+- Write a PRD when initiative spans more than ~3 issues, introduces a user-facing concept, or has cross-cutting architectural impact. Below that threshold, Linear issue description suffices.
+- Each issue references its parent PRD path in the issue description (e.g. `PRD: docs/prd/<slug>.md`).
 
 ## Plans Policy
 
-Linear issue description/checklist is the default planning artifact.
+Linear issue description is the default planning artifact. Create a plan in `docs/plans/` only when work is cross-cutting, high-risk, or architectural and cannot fit in one issue description. PRD = what + why; Plan = how; ADR = decision rationale.
 
-Create a repo plan in `docs/plans/` only when work is cross-cutting, high-risk, or architectural and
-cannot be made clear enough in a single issue description.
+## Worktree Lifecycle
 
-## Worktree Guidance
+- Implementer + Reviewer share one worktree per issue (Git allows only one branch checkout at a time).
+- Created at Implementer kickoff. Persists through review cycles and follow-up commits.
+- Deleted only after merge (or abandonment).
+- Run branch hygiene before kickoff: `git fetch --prune` + delete local branches already merged to `main`.
 
-Worktrees are recommended for parallel issue work or clean context isolation.
+## Sequential Execution
 
-- Use a worktree when juggling multiple active issues.
-- Use a normal branch in the main working copy when handling one issue at a time.
-- Both are valid as long as one issue maps to one PR.
-- For implementation agents, isolated worktree is the default unless the user requests current/main worktree.
+One issue in flight at a time per CPTO. No parallel Implementers. If parallelism is genuinely needed, run a second Claude Code instance with its own CPTO.
 
-## Worktree Lifecycle (avoid stale worktrees)
+## Autonomous Mode
 
-- Create a dedicated isolated worktree for implementation/review by default.
-- Implementation worktree should be removed after branch is pushed and PR is opened.
-- Review worktree should be removed after review feedback is posted.
-- For follow-up commits after review, create a fresh worktree for that cycle.
-- Keep local branch list clean with branch hygiene at each new kickoff.
+- Per-issue, verbal opt-in by CEO. CPTO confirms once before spawning.
+- CPTO posts `Mode: autonomous (CEO-authorized)` on the PR for durable trace (used by `/resume`).
+- CPTO may merge after review converges in autonomous mode.
+- All other rules (Linear requirement, branch naming, max 2 cycles, scope, local validation) still apply.
+- Autonomous mode does not authorize: direct-to-main commits, scope expansion, skipping required checks, or bypassing circuit breakers.
+
+## Recovery
+
+- On every cold start (new session, post-`/clear`, post-crash), CPTO runs `/resume` before accepting new instructions.
+- `/resume` is read-only by default: scans Linear, git worktrees, and GitHub PRs; classifies in-flight issues; proposes actions.
+- Source of truth for recovery: Linear status + git worktree state + GitHub PR thread (`CPTO arbitration:` history, `Mode: autonomous` trace).

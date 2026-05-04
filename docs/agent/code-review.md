@@ -2,116 +2,121 @@
 
 ## Purpose
 
-Provide a consistent, issue-aware review process for PRs using human or agent reviewers.
+Issue-aware review process for PRs. Procedural orchestration (spawning Reviewer, cycling, arbitrating, merging) lives in `/co-review` and `/kickoff` skills; this document defines what reviewers must check, what they return, and how CPTO arbitrates.
 
 ## Inputs
 
-Every review must use:
+Every review uses:
 
-- the linked Linear issue (`AWK-xxx`) as scope and acceptance source of truth,
-- `AGENTS.md`,
-- `docs/agent/testing.md`,
-- the full PR diff and changed files.
+- The linked Linear issue (`AWK-xxx`) as scope and AC source of truth.
+- `AGENTS.md` invariants.
+- `docs/agent/testing.md` required checks.
+- The full PR diff and the Implementer's structured PR description.
 
-If no Linear issue is linked, the review verdict is `needs changes` until an issue is created and linked.
+If no Linear issue is linked: verdict is `needs changes` until linkage is fixed.
 
-When a PR URL or PR ID is provided, the reviewer should read the PR first and derive the linked
-Linear issue from the PR context. If the PR does not clearly reference a Linear issue, flag it as
-`needs changes`.
+## Sequence
 
-## Reviewer Kickoff Decision Gate (required)
+1. Implementer pushes, opens PR with structured description, all local checks + tests green, reports back to CPTO.
+2. CPTO spawns Reviewer subagent in the existing worktree (no `isolation: "worktree"` flag; pass the path explicitly).
+3. Reviewer reads diff, runs tests in worktree, checks AC against the PR description's AC mapping, drafts structured findings, returns to CPTO.
+4. CPTO arbitrates each finding (accept / reject / defer). Posts arbitrated findings as a single PR review comment.
+5. If accepted items exist: cold-respawn Implementer (cycle 2) with arbitrated change list. Then cold-respawn Reviewer with cycle 2 prompt focused on previously-flagged items + diff since cycle 1.
+6. Max 2 cycles. After cycle 2, CPTO arbitrates remaining items, locks scope, hands to merge step.
+7. Merge:
+   - **Manual mode**: pause for CEO co-review of worktree; CEO merges.
+   - **Autonomous mode** (CEO opted in for this issue): CPTO verifies CI green, merges.
 
-Before starting review, explicitly answer:
+## PR Description Contract (Implementer-produced)
 
-1. Which Linear issue is this PR evaluated against?
-   - If PR URL/ID is provided, infer this from the PR first.
-   - If not inferable from PR context, request/flag missing issue linkage.
-2. Should review run in parallel using a subagent?
-   - Answer must be `yes` or `no`.
-3. Where should review run?
-   - `isolated worktree` (recommended default), or
-   - `current/main worktree`.
-4. Review scope:
-   - `full PR`, or
-   - `targeted` (specific files/concerns).
-5. Which model should review use?
-   - explicit model, or
-   - `default`.
+Reviewer's first check. If missing or incomplete, that's a `must-fix`:
 
-Default behavior when user does not specify:
+```md
+## Linear issue
+AWK-XX: <title>
 
-- review full PR against linked Linear issue,
-- use isolated worktree,
-- use subagent only when parallelization is useful,
-- use default model unless user requests a specific model.
+## Acceptance criteria coverage
+- [x] AC1 — verified by <test path or behavior reference>
+- [x] AC2 — verified by <test path or behavior reference>
 
-If kickoff is requested with a PR URL/ID, treat issue detection as pre-resolved from PR context and
-ask only questions 2, 3, and 4 unless issue linkage is missing.
+## Decisions made
+- Chose X over Y because <reason>
+- Skipped Z (out of scope per issue)
 
-## Reviewer Worktree Lifecycle
+## Test evidence
+<pnpm check output: pass>
+<pnpm test output: pass>
+<E2E output if relevant: pass>
 
-- Use an isolated worktree by default for review runs.
-- Delete the review worktree after posting review feedback.
-- If another review pass is needed after new commits, create a fresh review worktree.
+## Risks / things to flag for review
+- <anything Implementer is unsure about>
+```
 
-## Context Preservation and Manual Follow-up
+## Reviewer Output Contract
 
-- Review worktrees are ephemeral; review context must be preserved in GitHub PR comments.
-- Reviewer should post a structured summary (verdict, must-fix/should-fix items, test gaps) so
-  context survives worktree cleanup.
-- Manual review should use a fresh local checkout or a fresh local worktree of the PR branch.
-- Do not depend on reusing a deleted reviewer worktree.
+Returned to CPTO as structured text. Must enable arbitration without re-reading the full diff.
 
-## Default Review Sequence
+```md
+**Verdict**: ready | needs changes
 
-1. Implementation agent opens PR for a single Linear issue scope.
-2. Review agent performs structured PR review and posts findings on GitHub.
-3. Human + agent perform manual co-review locally on a fresh checkout/worktree of the PR branch.
-4. Approved fixes are applied in follow-up commits.
-5. Final manual confirmation determines merge readiness.
+**Findings**:
+- [must-fix] <file>:<line> — <description>
+  Impact: <why it matters>
+  Suggested fix: <concrete suggestion>
+- [should-fix] ...
+- [nit] ...
 
-AI review is advisory. Merge requires explicit manual approval.
+**Acceptance criteria coverage**:
+| AC | Status | Evidence (file:line or behavior) |
+| -- | ------ | -------------------------------- |
+| AC1 | covered | tests/x.test.ts:42 |
+| AC2 | partial | <what's missing> |
+| AC3 | not covered | <gap> |
 
-## Review Checklist
+**Test coverage assessment**:
+- Unit: <gaps>
+- Integration: <gaps>
+- E2E: <gaps>
 
-1. Scope match:
-   - Does the implementation satisfy the Linear issue acceptance criteria?
-   - Is there scope drift beyond the issue?
-   - Is PR/Linear linkage complete in both directions (PR mentions issue, issue links PR)?
-2. Architecture and conventions:
-   - Are `AGENTS.md` invariants respected?
-   - Are package boundaries and shell/iframe message contracts preserved?
-3. Tests and verification:
-   - Are required unit/integration/E2E tests present for changed behavior?
-   - Is evidence for `pnpm check`, unit, and relevant E2E coverage provided?
-4. Risk and regressions:
-   - Any behavioral regressions, compatibility risks, or missing migrations?
+**Risks / regressions noted**:
+- ...
 
-## Severity Levels
+**CI status**: green | red (<failing job>)
+```
 
-- `must-fix`: correctness, security, regression, acceptance criteria miss, architecture contract violation.
-- `should-fix`: meaningful maintainability/testability concern that should be resolved before merge when practical.
-- `nit`: optional style/readability improvement; does not block merge.
+## Severity
 
-## Output Format
+- `must-fix`: correctness, security, regression, AC miss, architecture invariant violation.
+- `should-fix`: maintainability/testability concern; resolve before merge when practical.
+- `nit`: optional style; does not block merge.
 
-Use this structure in PR review comments:
+## CPTO Arbitration Discipline
 
-1. **Verdict**: `ready` or `needs changes`
-2. **Must-fix findings**
-3. **Should-fix findings**
-4. **Nits (optional)**
-5. **Acceptance criteria coverage**
-6. **Test coverage assessment**
+Arbitration is the load-bearing step. Rubber-stamping Reviewer findings outsources the call.
+
+- **Accept**: finding is correct; goes to Implementer's change list.
+- **Reject**: Reviewer is wrong (false positive, misread intent, out of project context). Log reason in arbitration comment.
+- **Defer**: valid but out of scope. File new Linear issue, link in arbitration comment, do not expand current PR.
+
+Spot-read specific file:line if a finding's call is unclear. Don't re-read the full diff — that defeats the subagent split.
+
+After cycle 2, all open items are arbitrated to lock scope. No third cycle. In-scope must-fixes either land in this PR (final Implementer pass, no further review) or block merge.
 
 ## Scope Guardrails
 
-- Do not request out-of-scope feature work unless it is required to safely ship the issue.
-- Prefer precise, actionable suggestions over broad refactor asks.
-- If scope is wrong, recommend updating Linear first.
-- If new work surfaced in review is substantial, recommend creating a new Linear issue instead of expanding the current PR scope.
-- Out-of-scope findings (must-fix or should-fix items the implementer skipped as out of AC, or items that emerge during co-review) must be captured in Linear before the review is considered complete: as a comment on the consuming issue when one exists, or as a new low-priority issue otherwise. Reference the originating PR in each comment/issue so context survives.
+- Don't request out-of-scope work unless required to safely ship the issue.
+- Prefer precise actionable suggestions over broad refactor asks.
+- Substantial new work surfaced during review → recommend new Linear issue, not PR expansion.
+- Out-of-scope findings (deferred) must land in Linear before review is complete: comment on consuming issue if one exists, or new low-priority issue. Reference originating PR for context.
+
+## Worktree Model
+
+- Implementer + Reviewer share one worktree per issue.
+- Worktree persists from Implementer kickoff through merge.
+- Review context survives via PR comments, not via worktree filesystem.
 
 ## PR Comment Conventions
 
-- Do not @-mention humans by GitHub handle unless the handle was explicitly provided by the user — guessed handles ping strangers and force a comment edit. Refer to the actor by role ("co-review pass", "implementation agent", "review agent") instead of using `@<guess>`.
+- CPTO arbitration: prefix the comment `CPTO arbitration:`.
+- Autonomous-mode trace: `Mode: autonomous (CEO-authorized)` posted by CPTO after kickoff confirmation. Used by `/resume`.
+- Don't `@`-mention humans by GitHub handle unless the handle was explicitly provided. Refer by role ("Implementer", "Reviewer", "CPTO arbitration").

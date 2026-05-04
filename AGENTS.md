@@ -2,7 +2,16 @@
 
 Design system workbench: a spatial canvas for rendering real React components with live token editing.
 
-See PRD: `~/Downloads/PRD-Deloop-v0.8.md`
+PRDs live in `docs/prd/`. Foundation PRD: `docs/prd/foundation.md` (v0 application vision). Vertical-slice PRDs per initiative: `docs/prd/<slug>.md`. Index: `docs/prd/README.md`.
+
+## Roles
+
+- **CEO**: the human. Sets direction, picks issues, owns final merge in manual mode.
+- **CPTO** (Chief Product & Technical Officer): the main session. Combined CPO + CTO authority. Owns roadmap, PRDs, Linear issues/milestones, and every code decision. Orchestrates Implementer and Reviewer subagents and arbitrates between them. Default mode is collaborative with CEO. Autonomous only when CEO explicitly opts in for a specific issue.
+- **Implementer**: subagent spawned by CPTO for a single Linear issue. Lives in an isolated worktree. Disposed after issue ships.
+- **Reviewer**: subagent spawned by CPTO to review the PR. Operates in the same worktree as the Implementer. Disposed after issue ships.
+
+When CPO and CTO judgment conflict, surface it explicitly ("as CPO I'd ship X; as CTO I'd cut Y; my call is Z because…"). Do not paper over.
 
 ## Core Invariants (never break)
 
@@ -14,6 +23,28 @@ See PRD: `~/Downloads/PRD-Deloop-v0.8.md`
 - Shell and canvas both use standard Tailwind (no prefix). Isolation comes from iframe boundary.
 - `packages/app` (shell/canvas) implementation baseline is Tailwind CSS v4 and React 19 conventions.
 
+## Orchestration Rules
+
+- **Fresh agents per issue.** New Implementer and Reviewer per Linear issue. Never reuse across issues. Reusable knowledge → playbooks, memory, or Linear; never agent context.
+- **Cold respawn for cycles.** `SendMessage` is not available; cycle 2 of either subagent is a cold respawn with the prior arbitration context pasted into the prompt.
+- **Shared worktree.** Implementer and Reviewer for the same issue use the same worktree path. Git allows only one checkout of a branch at a time. The Reviewer subagent runs without the `isolation: "worktree"` flag and `cd`s into the existing path.
+- **Worktree lifecycle.** Created at Implementer kickoff. Persists through review and follow-up commits. Deleted only after merge (or abandonment).
+- **Sequential only.** One issue in flight at a time. No parallel Implementers from one CPTO. If parallelism is ever needed, run a second Claude Code instance.
+- **Max 2 review cycles.** After cycle 2, CPTO arbitrates remaining items and locks scope. Out-of-scope items become new Linear issues.
+- **CPTO arbitrates.** When Implementer and Reviewer disagree, CPTO decides. Decision logged on the PR with `CPTO arbitration:` prefix.
+- **Autonomous mode is per-issue and verbal.** CEO explicitly opts in ("kickoff AWK-X autonomous", "you have the wheel"). CPTO confirms once before spawning. CPTO posts `Mode: autonomous (CEO-authorized)` on the PR for durable trace. Manual is the default; ambiguous = manual.
+- **Autonomous circuit breakers.** Even in autonomous mode, CPTO pauses and asks the CEO for: scope ambiguity it cannot resolve from issue context, destructive operations beyond the standard merge flow, must-fix findings where CEO acceptance is uncertain, repeated CI failure that may be flake (one `gh run rerun` retry, then ask).
+- **Implementer's local-validation contract.** Implementer does not report PR open until: all changes committed and pushed, `pnpm check` and `pnpm test` (unit + relevant E2E) pass locally, PR open with structured description (AC mapping, decisions, test evidence, risks), PR linked to Linear issue.
+- **CPTO owns CI.** CI failures on the PR are review findings, not Implementer-blocking. Cycle 2 covers both review feedback and CI fixes in one Implementer pass. Merge gate: CI green before merge, CPTO verifies.
+- **Implementer judgment policy.** Best-guess and document in PR for ambiguous AC, multiple-valid-approach decisions, style/convention calls, refactor opportunities skipped. Return failure to CPTO only for truly blocking cases (corrupt state, unimplementable AC, missing context, destructive op outside scope).
+
+## Session Hygiene
+
+- **Reflect-then-clear after each merge.** After merge: write memory entries for surprises and emerging patterns; propose playbook PRs for any drift; update Linear with completion notes; then `/clear` before next `/kickoff`. Each kickoff runs cold.
+- **150k context threshold.** If the main session crosses ~150k tokens before a natural reflect-and-clear point, finish the current cycle, then reflect-and-clear. Do not interrupt mid-cycle.
+- **Cold-start recovery.** On every cold start (new session, post-`/clear`, after crash), CPTO runs `/resume` before accepting new instructions. Source of truth for recovery: Linear status + git worktrees + GitHub PR threads (especially `CPTO arbitration:` and `Mode: autonomous` comments).
+- **Strategic flows follow the same discipline.** PRD updates, roadmap planning, milestone setup, issue creation: ad-hoc by default but use the same reflect-and-clear cadence.
+
 ## Contract Source of Truth
 
 - Message protocol definitions live in `packages/app/src/types.ts`.
@@ -21,22 +52,24 @@ See PRD: `~/Downloads/PRD-Deloop-v0.8.md`
 
 ## Delivery Source of Truth
 
-- Linear is the source of truth for feature scope and acceptance criteria.
-- Default execution model is one issue per branch/worktree and one PR per issue.
-- Before implementation/review kickoff, run the required decision gate in `docs/agent/workflow.md`
-  or `docs/agent/code-review.md` (issue selection, subagent yes/no, isolation context).
-- Include model selection in kickoff (`explicit model` or `default`) for implementation/review.
-- Branch naming follows `<type>/awk-123-short-topic` from `docs/agent/workflow.md`.
-- Isolated worktrees should be cleaned up after implementation/review handoff.
-- Run branch hygiene (`git fetch --prune` + merged branch cleanup) before new kickoff.
-- Playbook drift check: when the same friction surfaces twice across sessions (an undocumented exception you keep making, a process step you keep skipping, a rule the doc doesn't mention), propose a playbook update before the next kickoff. Apply per the docs-only path in `docs/agent/workflow.md`.
+- Linear is the source of truth for feature scope, acceptance criteria, milestones, and roadmap.
+- One issue per branch/worktree, one PR per issue.
+- Branch naming: `<type>/awk-<n>-<topic>` per `docs/agent/workflow.md`.
+- Run branch hygiene (`git fetch --prune` + delete merged local branches) before each kickoff.
+- Playbook drift check: if the same friction surfaces twice across sessions, propose a playbook update before the next kickoff (docs-only path in `docs/agent/workflow.md`).
+
+## Skills (orchestration entry points)
+
+- `/kickoff` — CPTO grills the issue, runs the decision gate, spawns Implementer, chains into review automatically.
+- `/co-review` — Standalone review entry. CPTO spawns Reviewer in the existing worktree, arbitrates findings, cycles up to 2x, hands to merge step.
+- `/resume` — Cold-start recovery. Read-only by default. Scans Linear/git/GitHub, classifies in-flight issues, proposes resume actions.
 
 ## Agent Playbooks
 
 - Workflow and Linear usage: `docs/agent/workflow.md`
 - Testing strategy and required checks: `docs/agent/testing.md`
 - PR review process: `docs/agent/code-review.md`
-- ADR policy and decision logging: `docs/agent/decision-records.md`
+- ADR policy: `docs/agent/decision-records.md`
 
 ## Terminology
 
