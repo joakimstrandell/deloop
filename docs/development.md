@@ -13,10 +13,10 @@ pnpm install
 
 ## Run locally
 
-Start Deloop with the sample app fixture:
+Start Deloop dogfooding the bundled `@deloop/ui` design system:
 
 ```bash
-pnpm --filter @deloop/sample-app dev
+pnpm --filter @deloop/cli dev --root "$PWD/packages/ui" --port 4242 --no-open
 ```
 
 Default URL: `http://localhost:4242`
@@ -48,8 +48,7 @@ This repo uses Husky + lint-staged:
 
 - `packages/cli`: Node CLI and server runtime
 - `packages/app`: shell and iframe browser app
-- `packages/sample-app`: local fixture app for integration testing
-- `packages/ui`: shared UI package
+- `packages/ui`: shared UI design system; doubles as the canonical Deloop dogfooding target for local development and e2e
 
 ## Workflow
 
