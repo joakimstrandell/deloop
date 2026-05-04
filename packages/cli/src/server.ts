@@ -1,7 +1,6 @@
 import { createServer as createHttpServer } from "node:http";
 import { exec } from "node:child_process";
-import express from "express";
-import { WebSocketServer } from "ws";
+import express, { type Response } from "express";
 import { createViteComponentServer } from "./vite-component-server.js";
 import { createComponentRegistry } from "./component-watcher.js";
 import { loadDeloopConfig } from "./config-loader.js";
@@ -12,6 +11,13 @@ export interface ServerOptions {
   port: number;
   open: boolean;
 }
+
+/**
+ * SSE keep-alive interval. Browsers and intermediate proxies tend to drop
+ * idle connections at the 30–60s mark; a comment frame every 25s keeps the
+ * channel open without producing visible events.
+ */
+const SSE_KEEPALIVE_MS = 25_000;
 
 export async function startServer({ root, port, open }: ServerOptions): Promise<void> {
   const app = express();
@@ -32,21 +38,52 @@ export async function startServer({ root, port, open }: ServerOptions): Promise<
 
   const vite = await createViteComponentServer(root);
 
-  // REST API
+  // REST API — first paint of the sidebar reads this once. Subsequent
+  // updates flow through the SSE channel below.
   app.get("/api/components", async (_req, res) => {
     const components = await registry.list();
     res.json(components);
   });
 
+  // Server-Sent Events — pushes a `discovery` event with the full Component
+  // entry list whenever a file is added or removed under the configured
+  // sources. See `docs/adr/0004-sse-for-server-to-shell-push.md` for the
+  // duplex-vs-broadcast reasoning.
+  app.get("/api/events", (_req, res) => {
+    res.set({
+      "Content-Type": "text/event-stream",
+      "Cache-Control": "no-cache, no-transform",
+      Connection: "keep-alive",
+      // Disable Nginx-style proxy buffering if anything sits in front; SSE
+      // requires the response to flush per-frame.
+      "X-Accel-Buffering": "no",
+    });
+    res.flushHeaders();
+
+    function send(event: string, data: unknown): void {
+      res.write(`event: ${event}\n`);
+      res.write(`data: ${JSON.stringify(data)}\n\n`);
+    }
+
+    // Periodic comment frame — keeps proxies and browsers from idling out
+    // the connection. Comments are ignored by EventSource consumers.
+    const keepAlive = setInterval(() => {
+      res.write(`: keepalive\n\n`);
+    }, SSE_KEEPALIVE_MS);
+
+    const unsubscribe = registry.subscribe((components) => {
+      send("discovery", components);
+    });
+
+    const close = (): void => {
+      clearInterval(keepAlive);
+      unsubscribe();
+    };
+    _onSseClose(res, close);
+  });
+
   // Vite middleware handles all other requests (app, HMR, /@fs/ paths)
   app.use(vite.middlewares);
-
-  // WebSocket server — reserved for future realtime features
-  const wss = new WebSocketServer({ server: httpServer });
-  wss.on("connection", (ws) => {
-    console.log("[deloop] WebSocket client connected");
-    ws.on("close", () => console.log("[deloop] WebSocket client disconnected"));
-  });
 
   httpServer.listen(port, () => {
     const url = `http://localhost:${port}`;
@@ -87,4 +124,19 @@ export async function startServer({ root, port, open }: ServerOptions): Promise<
   httpServer.on("close", () => {
     void shutdown();
   });
+}
+
+// Express response close + abort handlers — both needed because clients can
+// either cleanly close (Connection: close) or abort mid-stream (browser tab
+// closed). Either path must release the registry subscription so closed
+// connections don't accumulate.
+function _onSseClose(res: Response, cb: () => void): void {
+  let called = false;
+  const once = (): void => {
+    if (called) return;
+    called = true;
+    cb();
+  };
+  res.on("close", once);
+  res.on("error", once);
 }
