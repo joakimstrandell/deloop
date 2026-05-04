@@ -91,10 +91,25 @@ export async function createComponentRegistry(
     publishTimer = setTimeout(() => {
       publishTimer = null;
       if (subscribers.size === 0) return;
-      void getOrStartRefresh().then((components) => {
-        for (const sub of subscribers) sub(components);
-      });
+      void publishCurrent();
     }, PUBLISH_DEBOUNCE_MS);
+  }
+
+  // Loop until we observe a refresh result that reflects the latest
+  // generation. Without this, the publisher could resolve with a snapshot
+  // taken before a chokidar event that fired during its in-flight refresh —
+  // the cache side is protected by the generation guard inside refresh(),
+  // but the publisher path also reads the result directly. Test:
+  // `does not deliver superseded data to subscribers` in component-watcher.test.ts.
+  async function publishCurrent(): Promise<void> {
+    let components: ComponentInfo[];
+    let startedAt: number;
+    do {
+      startedAt = generation;
+      components = await getOrStartRefresh();
+    } while (startedAt !== generation);
+    if (subscribers.size === 0) return;
+    for (const sub of subscribers) sub(components);
   }
 
   const watcher: FSWatcher | null =

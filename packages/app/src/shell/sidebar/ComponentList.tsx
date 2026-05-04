@@ -108,17 +108,15 @@ export function ComponentList({ onSelect }: Props) {
       }
     });
 
-    // The browser auto-reconnects on transient errors. `open` fires both on
-    // initial connect and on every successful reconnect, so we treat each
-    // open as a chance to do a catch-up REST fetch in case events fired
-    // during the disconnect window. The lastSseAt guard prevents overwriting
-    // a fresh post-reconnect SSE event with a stale REST snapshot.
-    let firstOpen = true;
+    // `open` fires on initial connect and on every successful reconnect.
+    // We refetch on every open — the first one closes a small but real race
+    // between the eager mount-time fetch (above) and the moment the server
+    // registers our SSE subscriber: a file added in that window would be
+    // dropped by the publisher's `subscribers.size === 0` guard. Subsequent
+    // opens recover any events missed during a disconnect. The lastSseAt
+    // guard inside refetch() drops stale REST results if SSE delivered
+    // fresher data first.
     es.addEventListener("open", () => {
-      if (firstOpen) {
-        firstOpen = false;
-        return;
-      }
       void refetch();
     });
 
@@ -178,13 +176,15 @@ export function ComponentList({ onSelect }: Props) {
       </ul>
       {/*
         Drag-image template — must be in the DOM for Safari to honour
-        setDragImage. Positioned far off-screen so the user never sees
-        this directly; the browser snapshots it at dragstart.
+        setDragImage. Positioned `fixed` (not `absolute`) so it resolves
+        against the viewport regardless of ancestor positioning, which
+        avoids any scroll-region or overflow side effects if the parent
+        ever changes its containing-block setup.
       */}
       <div
         ref={ghostRef}
         aria-hidden="true"
-        className="pointer-events-none absolute -top-[1000px] -left-[1000px] rounded-md bg-neutral-800 px-3 py-1.5 text-[13px] font-medium text-neutral-100 shadow-lg"
+        className="pointer-events-none fixed -top-[1000px] -left-[1000px] rounded-md bg-neutral-800 px-3 py-1.5 text-[13px] font-medium text-neutral-100 shadow-lg"
       />
     </>
   );
