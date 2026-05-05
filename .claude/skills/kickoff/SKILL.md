@@ -53,7 +53,7 @@ After CEO confirms:
 
 1. **Update Linear** with the refined AC and locked decisions baked into the issue description (or appended as a "Locked scope" section). Linear is the durable record.
 2. **Write the handoff** to `.claude/handoffs/<ISSUE_ID>.md` using the template below. The handoff is a self-contained Implementer spawn prompt that the cold CPTO will read and pass to the `Agent` tool verbatim.
-3. **Advise `/clear`**. Post a chat message: *"Linear updated. Handoff written to `.claude/handoffs/<ID>.md`. Run `/clear`, then `/kickoff <ID>` to spawn the Implementer."*
+3. **Advise `/clear`**. Post a chat message: _"Linear updated. Handoff written to `.claude/handoffs/<ID>.md`. Run `/clear`, then `/kickoff <ID>` to spawn the Implementer."_
 4. **Stop.** Session A ends here. Do not spawn the Implementer in Session A. Do not chain into review.
 
 ### Handoff file template
@@ -86,6 +86,7 @@ You are the Implementer for [AWK-XX](<linear url>). Operate in your assigned wor
 ## Rules from AGENTS.md (paste relevant sections verbatim)
 
 <paste:
+
 - Roles section (your role: Implementer)
 - Core Invariants (every invariant relevant to this issue's surface area)
 - Orchestration Rules: "Implementer's local-validation contract", "Implementer judgment policy"

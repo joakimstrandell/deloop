@@ -2,6 +2,14 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 
+/*
+  Tailwind v4 idiom: user CSS owns its content roots. Without this, when
+  this CSS is loaded as the canvas style environment (AWK-13), Tailwind
+  would scan only the input file's directory tree and miss the @deloop/ui
+  shadcn components that sit one level up alongside this stylesheet.
+*/
+@source "../components";
+
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {

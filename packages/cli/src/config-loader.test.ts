@@ -2,7 +2,7 @@ import { describe, it, expect, afterEach, vi } from "vitest";
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { loadDeloopConfig } from "./config-loader.js";
+import { autoDetectStylesPath, loadDeloopConfig } from "./config-loader.js";
 
 let root: string;
 
@@ -60,6 +60,144 @@ describe("loadDeloopConfig", () => {
     expect(result?.components).toEqual(["src/widgets", "src/forms"]);
   });
 
+  it("normalizes the styles field as a single CSS entry path", async () => {
+    root = makeRoot();
+    mkdirSync(join(root, ".deloop"), { recursive: true });
+    writeFileSync(
+      join(root, ".deloop/config.ts"),
+      `export default { styles: "src/styles/app.css" };\n`,
+      "utf8",
+    );
+
+    const result = await loadDeloopConfig(root);
+
+    expect(result).toEqual({ styles: "src/styles/app.css" });
+  });
+
+  it("accepts an array of strings for styles (multi-source)", async () => {
+    root = makeRoot();
+    mkdirSync(join(root, ".deloop"), { recursive: true });
+    writeFileSync(
+      join(root, ".deloop/config.ts"),
+      `export default { styles: ["design-system.css", "overrides.css"] };\n`,
+      "utf8",
+    );
+
+    const result = await loadDeloopConfig(root);
+
+    expect(result).toEqual({ styles: ["design-system.css", "overrides.css"] });
+  });
+
+  it("filters non-string entries out of a styles array", async () => {
+    root = makeRoot();
+    mkdirSync(join(root, ".deloop"), { recursive: true });
+    writeFileSync(
+      join(root, ".deloop/config.ts"),
+      `export default { styles: ["a.css", 42, null, "b.css"] };\n`,
+      "utf8",
+    );
+
+    const result = await loadDeloopConfig(root);
+
+    expect(result).toEqual({ styles: ["a.css", "b.css"] });
+  });
+
+  it("preserves an empty styles array (warn is the runtime signal)", async () => {
+    root = makeRoot();
+    mkdirSync(join(root, ".deloop"), { recursive: true });
+    writeFileSync(join(root, ".deloop/config.ts"), `export default { styles: [] };\n`, "utf8");
+
+    const result = await loadDeloopConfig(root);
+
+    expect(result).toEqual({ styles: [] });
+  });
+
+  it("collapses a blank styles string to an empty array (configured-but-empty)", async () => {
+    root = makeRoot();
+    mkdirSync(join(root, ".deloop"), { recursive: true });
+    writeFileSync(join(root, ".deloop/config.ts"), `export default { styles: "" };\n`, "utf8");
+
+    const result = await loadDeloopConfig(root);
+
+    expect(result).toEqual({ styles: [] });
+  });
+
+  it("collapses a whitespace-only styles string to an empty array", async () => {
+    root = makeRoot();
+    mkdirSync(join(root, ".deloop"), { recursive: true });
+    writeFileSync(join(root, ".deloop/config.ts"), `export default { styles: "   " };\n`, "utf8");
+
+    const result = await loadDeloopConfig(root);
+
+    expect(result).toEqual({ styles: [] });
+  });
+
+  it("collapses a styles array of one blank entry to an empty array", async () => {
+    root = makeRoot();
+    mkdirSync(join(root, ".deloop"), { recursive: true });
+    writeFileSync(join(root, ".deloop/config.ts"), `export default { styles: [""] };\n`, "utf8");
+
+    const result = await loadDeloopConfig(root);
+
+    expect(result).toEqual({ styles: [] });
+  });
+
+  it("filters blank entries out of a styles array", async () => {
+    root = makeRoot();
+    mkdirSync(join(root, ".deloop"), { recursive: true });
+    writeFileSync(
+      join(root, ".deloop/config.ts"),
+      `export default { styles: ["foo.css", "", "bar.css"] };\n`,
+      "utf8",
+    );
+
+    const result = await loadDeloopConfig(root);
+
+    expect(result).toEqual({ styles: ["foo.css", "bar.css"] });
+  });
+
+  it("filters whitespace-only entries out of a styles array", async () => {
+    root = makeRoot();
+    mkdirSync(join(root, ".deloop"), { recursive: true });
+    writeFileSync(
+      join(root, ".deloop/config.ts"),
+      `export default { styles: ["foo.css", "   ", "bar.css"] };\n`,
+      "utf8",
+    );
+
+    const result = await loadDeloopConfig(root);
+
+    expect(result).toEqual({ styles: ["foo.css", "bar.css"] });
+  });
+
+  it("normalizes the componentsDir field as a single directory path", async () => {
+    root = makeRoot();
+    mkdirSync(join(root, ".deloop"), { recursive: true });
+    writeFileSync(
+      join(root, ".deloop/config.ts"),
+      `export default { componentsDir: "src/components" };\n`,
+      "utf8",
+    );
+
+    const result = await loadDeloopConfig(root);
+
+    expect(result).toEqual({ componentsDir: "src/components" });
+  });
+
+  it("drops styles when neither string nor array; drops componentsDir when not a string", async () => {
+    root = makeRoot();
+    mkdirSync(join(root, ".deloop"), { recursive: true });
+    writeFileSync(
+      join(root, ".deloop/config.ts"),
+      `export default { styles: 42, componentsDir: ["a"] };\n`,
+      "utf8",
+    );
+
+    const result = await loadDeloopConfig(root);
+
+    expect(result).toEqual({});
+  });
+
   describe("malformed user config", () => {
     it("returns null and warns when the config has a syntax error", async () => {
       root = makeRoot();
@@ -99,5 +237,38 @@ describe("loadDeloopConfig", () => {
         warn.mockRestore();
       }
     });
+  });
+});
+
+describe("autoDetectStylesPath", () => {
+  it("returns null when no conventional CSS entry exists", () => {
+    root = makeRoot();
+    mkdirSync(root, { recursive: true });
+    expect(autoDetectStylesPath(root)).toBeNull();
+  });
+
+  it("prefers src/styles/globals.css over other candidates", () => {
+    root = makeRoot();
+    mkdirSync(join(root, "src/styles"), { recursive: true });
+    writeFileSync(join(root, "src/styles/globals.css"), "/* a */", "utf8");
+    writeFileSync(join(root, "src/styles/index.css"), "/* b */", "utf8");
+
+    expect(autoDetectStylesPath(root)).toBe("src/styles/globals.css");
+  });
+
+  it("falls back to src/index.css when styles directory is absent", () => {
+    root = makeRoot();
+    mkdirSync(join(root, "src"), { recursive: true });
+    writeFileSync(join(root, "src/index.css"), "/* c */", "utf8");
+
+    expect(autoDetectStylesPath(root)).toBe("src/index.css");
+  });
+
+  it("walks all candidates in declared order", () => {
+    root = makeRoot();
+    mkdirSync(join(root, "src"), { recursive: true });
+    writeFileSync(join(root, "src/styles.css"), "/* d */", "utf8");
+
+    expect(autoDetectStylesPath(root)).toBe("src/styles.css");
   });
 });
