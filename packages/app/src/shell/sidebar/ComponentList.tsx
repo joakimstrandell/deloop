@@ -150,8 +150,12 @@ export function ComponentList({ onSelect }: Props) {
       <ul className="m-0 list-none flex-1 overflow-y-auto p-0 py-1">
         {components.map((component) => {
           const dragging = draggingPath === component.path;
+          // Multiple shim exports share the same `path`, so the key must
+          // also include the export `name` to stay unique under the strict
+          // shim-only discovery model (ADR-0005).
+          const key = `${component.path}:${component.name}`;
           return (
-            <li key={component.path}>
+            <li key={key}>
               <button
                 type="button"
                 draggable

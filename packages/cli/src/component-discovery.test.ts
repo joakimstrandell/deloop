@@ -4,12 +4,9 @@ import { dirname, join } from "node:path";
 import { tmpdir } from "node:os";
 import { discoverComponents } from "./component-discovery.js";
 
-function makeProject(files: Record<string, string> | string[]): string {
+function makeProject(files: Record<string, string>): string {
   const root = join(tmpdir(), `deloop-test-${Date.now()}-${Math.random().toString(36).slice(2)}`);
-  const entries: Array<[string, string]> = Array.isArray(files)
-    ? files.map((f) => [f, ""])
-    : Object.entries(files);
-  for (const [file, contents] of entries) {
+  for (const [file, contents] of Object.entries(files)) {
     const full = join(root, file);
     mkdirSync(dirname(full), { recursive: true });
     writeFileSync(full, contents);
@@ -23,156 +20,235 @@ afterEach(() => {
   if (root) rmSync(root, { recursive: true, force: true });
 });
 
-describe("discoverComponents", () => {
-  it("returns component files under src/components", async () => {
-    root = makeProject(["src/components/Button.tsx", "src/components/Card.tsx"]);
-    const result = await discoverComponents(root);
-    const names = result.map((c) => c.name).sort();
-    expect(names).toEqual(["Button", "Card"]);
-  });
-
-  it("excludes test files", async () => {
-    root = makeProject([
-      "src/components/Button.tsx",
-      "src/components/Button.test.tsx",
-      "src/components/Button.spec.tsx",
-    ]);
+describe("discoverComponents — strict shim-only (default)", () => {
+  it("scans only *.deloop.tsx files; bare .tsx is ignored", async () => {
+    root = makeProject({
+      "src/components/button.tsx": "export function Button(){ return null; }",
+      "src/components/button.deloop.tsx": "export function Button(){ return null; }",
+      "src/components/card.tsx": "export function Card(){ return null; }",
+    });
     const result = await discoverComponents(root);
     expect(result.map((c) => c.name)).toEqual(["Button"]);
+    expect(result[0]?.relativePath).toBe("src/components/button.deloop.tsx");
   });
 
-  it("excludes story files", async () => {
-    root = makeProject([
-      "src/components/Button.tsx",
-      "src/components/Button.stories.tsx",
-      "src/components/Button.story.tsx",
-    ]);
+  it("emits one ComponentInfo per named export of a shim", async () => {
+    root = makeProject({
+      "src/components/button.deloop.tsx": `
+        export function Button(){ return null; }
+        export function ButtonGhost(){ return null; }
+        export const ButtonOutline = () => null;
+      `,
+    });
     const result = await discoverComponents(root);
-    expect(result.map((c) => c.name)).toEqual(["Button"]);
+    expect(result.map((c) => c.name).sort()).toEqual(["Button", "ButtonGhost", "ButtonOutline"]);
+    // All entries point at the same shim file.
+    const paths = new Set(result.map((c) => c.path));
+    expect(paths.size).toBe(1);
   });
 
-  it("returns empty array when no components exist", async () => {
-    root = makeProject([]);
+  it("preserves verbatim casing of the export identifier", async () => {
+    root = makeProject({
+      "src/components/widget.deloop.tsx": `
+        export function MyWidget(){ return null; }
+        export function widgetSmall(){ return null; }
+      `,
+    });
+    const result = await discoverComponents(root);
+    expect(result.map((c) => c.name).sort()).toEqual(["MyWidget", "widgetSmall"]);
+  });
+
+  it("yields zero entries for an empty shim with no named exports", async () => {
+    root = makeProject({
+      "src/components/empty.deloop.tsx": ``,
+    });
     const result = await discoverComponents(root);
     expect(result).toEqual([]);
   });
 
-  it("sets relativePath relative to projectRoot", async () => {
-    root = makeProject(["src/components/sub/Icon.tsx"]);
+  it("yields zero entries for a shim with only a default export", async () => {
+    root = makeProject({
+      "src/components/only-default.deloop.tsx": `export default function X(){ return null; }`,
+    });
     const result = await discoverComponents(root);
-    expect(result[0]?.relativePath).toBe("src/components/sub/Icon.tsx");
+    expect(result).toEqual([]);
   });
 
-  it("sets absolute path", async () => {
-    root = makeProject(["src/components/Button.tsx"]);
+  it("ignores default exports while keeping named exports", async () => {
+    root = makeProject({
+      "src/components/mixed.deloop.tsx": `
+        export default function Hidden(){ return null; }
+        export function Visible(){ return null; }
+      `,
+    });
     const result = await discoverComponents(root);
-    expect(result[0]?.path).toBe(join(root, "src/components/Button.tsx"));
+    expect(result.map((c) => c.name)).toEqual(["Visible"]);
   });
 
-  describe("config override", () => {
-    it("scans configured directories instead of the default", async () => {
-      root = makeProject([
-        "src/components/Button.tsx",
-        "src/widgets/Slider.tsx",
-        "src/widgets/Toggle.tsx",
-      ]);
-      const result = await discoverComponents(root, { components: ["src/widgets"] });
-      const names = result.map((c) => c.name).sort();
-      expect(names).toEqual(["Slider", "Toggle"]);
+  it("counts named re-exports (export { X } from './y')", async () => {
+    root = makeProject({
+      "src/components/inner.tsx": "export function Inner(){ return null; }",
+      "src/components/wrap.deloop.tsx": `export { Inner } from "./inner";`,
     });
-
-    it("supports multiple configured directories", async () => {
-      root = makeProject([
-        "src/widgets/Slider.tsx",
-        "src/forms/Input.tsx",
-        "src/components/Other.tsx",
-      ]);
-      const result = await discoverComponents(root, {
-        components: ["src/widgets", "src/forms"],
-      });
-      const names = result.map((c) => c.name).sort();
-      expect(names).toEqual(["Input", "Slider"]);
-    });
-
-    it("supports explicit glob patterns", async () => {
-      root = makeProject([
-        "src/widgets/Slider.tsx",
-        "src/widgets/nested/Toggle.tsx",
-        "src/forms/Input.tsx",
-      ]);
-      const result = await discoverComponents(root, {
-        components: ["src/widgets/**/*.tsx"],
-      });
-      const names = result.map((c) => c.name).sort();
-      expect(names).toEqual(["Slider", "Toggle"]);
-    });
-
-    it("falls back to the default when components is undefined", async () => {
-      root = makeProject(["src/components/Button.tsx"]);
-      const result = await discoverComponents(root, {});
-      expect(result.map((c) => c.name)).toEqual(["Button"]);
-    });
-
-    it("returns empty when components override is an empty array", async () => {
-      root = makeProject(["src/components/Button.tsx"]);
-      const result = await discoverComponents(root, { components: [] });
-      expect(result).toEqual([]);
-    });
+    const result = await discoverComponents(root);
+    expect(result.map((c) => c.name)).toEqual(["Inner"]);
+    expect(result[0]?.relativePath).toBe("src/components/wrap.deloop.tsx");
   });
 
-  describe("barrel/re-export handling", () => {
-    it("excludes index.tsx that only re-exports siblings", async () => {
-      root = makeProject({
-        "src/components/Button.tsx": "export default function Button(){ return null; }",
-        "src/components/index.tsx": `export { default as Button } from "./Button";\n`,
-      });
-      const result = await discoverComponents(root);
-      const names = result.map((c) => c.name).sort();
-      expect(names).toEqual(["Button"]);
+  it("uses the renamed export for `export { X as Y }`", async () => {
+    root = makeProject({
+      "src/components/inner.tsx": "export function Original(){ return null; }",
+      "src/components/wrap.deloop.tsx": `export { Original as Renamed } from "./inner";`,
     });
-
-    it("includes a non-barrel file that happens to be named index", async () => {
-      root = makeProject({
-        "src/components/Button/index.tsx": "export default function Button(){ return null; }\n",
-      });
-      const result = await discoverComponents(root);
-      // The directory-named index file is a real component; we still want it
-      // and its name should reflect its parent directory rather than literally "index".
-      const names = result.map((c) => c.name);
-      expect(names).toEqual(["Button"]);
-    });
-
-    it("excludes namespace re-exports (export * as ns from)", async () => {
-      root = makeProject({
-        "src/components/Button.tsx": "export default function Button(){ return null; }",
-        "src/components/index.tsx": `export * as buttons from "./Button";\n`,
-      });
-      const result = await discoverComponents(root);
-      const names = result.map((c) => c.name).sort();
-      expect(names).toEqual(["Button"]);
-    });
-
-    it("excludes multi-line named re-exports", async () => {
-      root = makeProject({
-        "src/components/Button.tsx": "export default function Button(){ return null; }",
-        "src/components/Card.tsx": "export default function Card(){ return null; }",
-        "src/components/index.tsx": `export {\n  Button,\n  Card,\n} from "./components";\n`,
-      });
-      const result = await discoverComponents(root);
-      const names = result.map((c) => c.name).sort();
-      expect(names).toEqual(["Button", "Card"]);
-    });
+    const result = await discoverComponents(root);
+    expect(result.map((c) => c.name)).toEqual(["Renamed"]);
   });
 
-  describe("forwardRef wrappers", () => {
-    it("registers a forwardRef default export under the filename", async () => {
-      root = makeProject({
-        "src/components/Input.tsx": `import { forwardRef } from "react";
-export default forwardRef(function Input(_props, _ref){ return null; });
-`,
-      });
-      const result = await discoverComponents(root);
-      expect(result.map((c) => c.name)).toEqual(["Input"]);
+  it("supports shims in a separate folder (no co-location requirement)", async () => {
+    root = makeProject({
+      "src/components/button.tsx": "export function Button(){ return null; }",
+      "src/deloop/button.deloop.tsx": `
+        // Note: explicit-glob default doesn't reach src/deloop, so we config
+        // it via the components option below.
+        export function Button(){ return null; }
+      `,
     });
+    const result = await discoverComponents(root, { components: ["src/deloop"] });
+    expect(result.map((c) => c.name)).toEqual(["Button"]);
+    expect(result[0]?.relativePath).toBe("src/deloop/button.deloop.tsx");
+  });
+
+  it("excludes test/spec/story files even with .deloop.tsx siblings", async () => {
+    root = makeProject({
+      "src/components/button.deloop.tsx": "export function Button(){ return null; }",
+      "src/components/button.test.tsx": "export function Test(){ return null; }",
+    });
+    const result = await discoverComponents(root);
+    expect(result.map((c) => c.name)).toEqual(["Button"]);
+  });
+
+  it("dedupes identical export identifiers within a single shim", async () => {
+    // Malformed but should not crash. TypeScript would error at typecheck
+    // time, but discovery must remain robust on user input.
+    root = makeProject({
+      "src/components/dup.deloop.tsx": `
+        export function X(){ return null; }
+        export const X = () => null;
+      `,
+    });
+    const result = await discoverComponents(root);
+    expect(result.map((c) => c.name)).toEqual(["X"]);
+  });
+
+  it("sorts by (relativePath, name) ascending", async () => {
+    root = makeProject({
+      "src/components/b.deloop.tsx": `
+        export const B2 = () => null;
+        export const B1 = () => null;
+      `,
+      "src/components/a.deloop.tsx": `export const A = () => null;`,
+    });
+    const result = await discoverComponents(root);
+    expect(result.map((c) => `${c.relativePath}:${c.name}`)).toEqual([
+      "src/components/a.deloop.tsx:A",
+      "src/components/b.deloop.tsx:B1",
+      "src/components/b.deloop.tsx:B2",
+    ]);
+  });
+
+  it("returns empty when no shims exist under default sources", async () => {
+    root = makeProject({
+      "src/components/button.tsx": "export function Button(){ return null; }",
+    });
+    const result = await discoverComponents(root);
+    expect(result).toEqual([]);
+  });
+
+  it("sets absolute path on the discovered shim", async () => {
+    root = makeProject({
+      "src/components/button.deloop.tsx": `export function Button(){ return null; }`,
+    });
+    const result = await discoverComponents(root);
+    expect(result[0]?.path).toBe(join(root, "src/components/button.deloop.tsx"));
+  });
+});
+
+describe("discoverComponents — config override", () => {
+  it("scans configured directories under the shim-only default expansion", async () => {
+    root = makeProject({
+      "src/components/button.deloop.tsx": "export function Button(){ return null; }",
+      "src/widgets/slider.deloop.tsx": "export function Slider(){ return null; }",
+      "src/widgets/toggle.deloop.tsx": "export function Toggle(){ return null; }",
+    });
+    const result = await discoverComponents(root, { components: ["src/widgets"] });
+    expect(result.map((c) => c.name).sort()).toEqual(["Slider", "Toggle"]);
+  });
+
+  it("supports multiple configured directories", async () => {
+    root = makeProject({
+      "src/widgets/slider.deloop.tsx": "export function Slider(){ return null; }",
+      "src/forms/input.deloop.tsx": "export function Input(){ return null; }",
+      "src/components/other.deloop.tsx": "export function Other(){ return null; }",
+    });
+    const result = await discoverComponents(root, {
+      components: ["src/widgets", "src/forms"],
+    });
+    expect(result.map((c) => c.name).sort()).toEqual(["Input", "Slider"]);
+  });
+
+  it("explicit globs are passed through verbatim — opts back into bare-file scanning", async () => {
+    // The escape hatch documented in ADR-0005: an explicit glob is honored
+    // as-is. A user pointing at `src/widgets/**/*.tsx` opts into bare-file
+    // scanning where each file produces one entry under its filename.
+    root = makeProject({
+      "src/widgets/slider.tsx": "export function Slider(){ return null; }",
+      "src/widgets/nested/toggle.tsx": "export function Toggle(){ return null; }",
+    });
+    const result = await discoverComponents(root, {
+      components: ["src/widgets/**/*.tsx"],
+    });
+    expect(result.map((c) => c.name).sort()).toEqual(["slider", "toggle"]);
+  });
+
+  it("falls back to the default when components is undefined", async () => {
+    root = makeProject({
+      "src/components/button.deloop.tsx": "export function Button(){ return null; }",
+    });
+    const result = await discoverComponents(root, {});
+    expect(result.map((c) => c.name)).toEqual(["Button"]);
+  });
+
+  it("returns empty when components override is an empty array", async () => {
+    root = makeProject({
+      "src/components/button.deloop.tsx": "export function Button(){ return null; }",
+    });
+    const result = await discoverComponents(root, { components: [] });
+    expect(result).toEqual([]);
+  });
+});
+
+describe("discoverComponents — explicit-glob bare-file path", () => {
+  // The bare-file path is a documented opt-out for users who explicitly
+  // glob non-shim `.tsx` files. Barrel detection is retained there so an
+  // `index.tsx` re-export file doesn't pollute the sidebar.
+  it("filters barrel index.tsx when scanned via an explicit glob", async () => {
+    root = makeProject({
+      "src/components/button.tsx": "export default function Button(){ return null; }",
+      "src/components/index.tsx": `export { default as Button } from "./button";\n`,
+    });
+    const result = await discoverComponents(root, {
+      components: ["src/components/**/*.tsx"],
+    });
+    expect(result.map((c) => c.name).sort()).toEqual(["button"]);
+  });
+
+  it("derives bare-file name from the parent directory for index.tsx", async () => {
+    root = makeProject({
+      "src/components/Button/index.tsx": "export default function Button(){ return null; }\n",
+    });
+    const result = await discoverComponents(root, {
+      components: ["src/components/**/*.tsx"],
+    });
+    expect(result.map((c) => c.name)).toEqual(["Button"]);
   });
 });

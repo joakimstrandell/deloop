@@ -33,23 +33,19 @@ A live-rendered instance of a component module placed on the canvas. Each card h
 _Avoid_: instance, preview, tile
 
 **Shim file**:
-A `*.deloop.tsx` file co-located with a component file (e.g. `Tooltip.deloop.tsx` next to `Tooltip.tsx`) that defines what Deloop renders on the canvas for that name. Its `default` export becomes the primary renderable; named exports become Variants. When a shim file exists, the bare component file is suppressed from discovery — the shim is the source of truth.
+A `*.deloop.tsx` file (e.g. `tooltip.deloop.tsx`, optionally co-located with the component file or in a separate folder) that declares what Deloop renders on the canvas. Each named export becomes one Component entry; the export identifier (verbatim) is the entry's `name`. Default exports are ignored. Empty shims (no named exports) produce zero entries. See ADR-0005 for the strict shim-only discovery model.
 _Avoid_: story file, example file, deloop story
-
-**Variant**:
-An additional sidebar entry produced from a named export of a shim file. Surfaces in the sidebar as `<Component> (<variant>)` (e.g. "Button (outline)", "Button (ghost)"). Used to expose multiple meaningful configurations of the same component.
-_Avoid_: story, example, preset
 
 **Standalone component**:
 A component entry that is meaningful as a single Card (Button, Hero). The default for any discovered component without composition concerns.
 _Avoid_: leaf, primitive
 
 **Slot component**:
-A component entry only meaningful as a descendant of a specific compound parent (TooltipTrigger, AccordionItem). Not a valid standalone Card target — typically excluded from discovery either by absence of default export or by an opt-out mechanism.
+A component entry only meaningful as a descendant of a specific compound parent (TooltipTrigger, AccordionItem). Not a valid standalone Card target — typically not given its own Shim file; surfaces only as part of a Compound's shim composition.
 _Avoid_: child component, sub-component
 
 **Compound component**:
-A component entry whose useful rendering requires Slot children (Tooltip, Accordion). Typically exposed via a Shim file that composes it with default Slots.
+A component entry whose useful rendering requires Slot children (Tooltip, Accordion). Typically exposed via a Shim file that composes it with default Slots and any required providers (e.g. `TooltipProvider` wrapping a `Tooltip`).
 _Avoid_: parent component, container component
 
 ### Events
@@ -60,21 +56,21 @@ _Avoid_: file change, watch event, component update
 
 ## Relationships
 
-- A **User project** contains many **Component entries**, one per discovered file (or per Shim export)
+- A **User project** contains many **Component entries**, one per **Shim** named export
 - A **Component entry** points to exactly one **Component module**
 - A **Component module** can be mounted as zero or more **Cards** on the **Canvas**
 - The **Shell** owns the list of **Component entries**; the **Canvas** owns the **Cards**
 - A **Discovery event** mutates the **Shell**'s set of **Component entries**, never the **Cards**
-- A **Shim file** overrides the bare component file with the same base name; one Shim can produce a primary entry plus zero or more **Variant** entries
-- **Standalone**, **Slot**, and **Compound** are kinds a Component entry can take; Slot entries are typically not exposed in the sidebar
+- A **Shim file** is the only source of **Component entries** — bare component files are not discovered
+- **Standalone**, **Slot**, and **Compound** are kinds a Component entry can take; Slot entries are typically composed inside a Compound shim rather than exposed on their own
 
 ## Example dialogue
 
 > **Dev:** "When the user edits a component's padding in their editor, what updates?"
 > **Domain expert:** "The **Component module** is recompiled by Vite and hot-swapped into every **Card** rendering it. The **Component entry** doesn't change — same name, same path. No **Discovery event** fires."
 
-> **Dev:** "And if they create a new file `Card.tsx` in `src/components/`?"
-> **Domain expert:** "The watcher fires a **Discovery event** with the new **Component entry**. The **Shell** appends it to the sidebar. Nothing renders on the **Canvas** until someone drags it in."
+> **Dev:** "And if they create a new shim `card.deloop.tsx` exporting `Card`?"
+> **Domain expert:** "The watcher fires a **Discovery event** with the new **Component entry**. The **Shell** appends it to the sidebar. Nothing renders on the **Canvas** until someone drags it in. A bare `Card.tsx` on its own would not produce an entry — only shims are discovered."
 
 ## Flagged ambiguities
 

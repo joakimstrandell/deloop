@@ -5,7 +5,6 @@
     "forceConsistentCasingInFileNames": true,
     "moduleResolution": "Bundler",
     "lib": ["ESNext", "DOM", "DOM.Iterable"],
-    "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"]
     }
