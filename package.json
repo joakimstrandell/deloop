@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "deloop": "pnpm --filter @deloop/cli dev --root $PWD/packages/ui --port 4242 --no-open",
     "lint": "pnpm exec oxlint .",
     "format": "pnpm exec oxfmt .",
     "format:check": "pnpm exec oxfmt --check .",
