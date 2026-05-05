@@ -10,7 +10,7 @@ import {
 import { createPortal } from "react-dom";
 import { parseShellToIframeMessage } from "../protocol.js";
 import { resolveComponentExport } from "./resolve-component.js";
-import type { IframeToShellMessage, PseudoState } from "../types.js";
+import type { ColorScheme, IframeToShellMessage, PseudoState } from "../types.js";
 
 interface MountedCard {
   cardId: string;
@@ -150,32 +150,65 @@ const CHROME_CSS = `
   font-size: 0.75rem;
   color: #6b7280;
 }
-@media (prefers-color-scheme: dark) {
-  /*
-   * Chrome dark-mode mirror. The user's CSS owns user-component dark mode
-   * via its own .dark class on <html>; chrome reads the OS preference so
-   * the frame doesn't blind users in a dark canvas.
-   */
-  .deloop-card {
-    background: #0a0a0a;
-    border-color: #262626;
-    color: #e5e7eb;
-  }
-  .deloop-card[data-pseudo-state="hover"] {
-    border-color: #404040;
-  }
-  .deloop-card[data-pseudo-state="active"] {
-    border-color: #525252;
-  }
-  .deloop-card-label,
-  .deloop-card-loading {
-    color: #737373;
-  }
+/*
+ * Chrome dark-mode mirror, gated on the resolved shell scheme (AWK-79).
+ *
+ * Pre-AWK-79 this block was a prefers-color-scheme media query, which
+ * tracked the OS preference directly. The shell now owns the user's
+ * Mode (light / dark / system) and broadcasts a resolved scheme; the
+ * host element data-color-scheme="dark" attribute is the single source
+ * of truth the chrome reacts to. :host([...]) selectors stay inside the
+ * shadow tree and never need :host-context() (which Firefox lacks).
+ */
+:host([data-color-scheme="dark"]) .deloop-card {
+  background: #0a0a0a;
+  border-color: #262626;
+  color: #e5e7eb;
+}
+:host([data-color-scheme="dark"]) .deloop-card[data-pseudo-state="hover"] {
+  border-color: #404040;
+}
+:host([data-color-scheme="dark"]) .deloop-card[data-pseudo-state="active"] {
+  border-color: #525252;
+}
+:host([data-color-scheme="dark"]) .deloop-card-label,
+:host([data-color-scheme="dark"]) .deloop-card-loading {
+  color: #737373;
 }
 `;
 
+/**
+ * Reads the cold-load scheme that `main.tsx` stamped onto
+ * `document.documentElement` before React mounted. Falls back to
+ * `"light"` if the attribute is missing or unrecognised — same defensive
+ * stance as `readStoredMode`, since the attribute is observable
+ * developer-facing surface.
+ */
+function readBootstrapScheme(): ColorScheme {
+  if (typeof document === "undefined") return "light";
+  const stamped = document.documentElement.dataset["colorScheme"];
+  return stamped === "dark" ? "dark" : "light";
+}
+
+/**
+ * Imperatively applies a resolved scheme to the iframe document.
+ * Centralised so the cold-load bootstrap and `setColorScheme` handler
+ * never drift apart on which surfaces get touched (currently: the
+ * `.dark` class on `<html>` for the user component CSS, and the
+ * `data-color-scheme` attribute on `<html>` as a backup signal).
+ *
+ * The shadow host's own attribute is set declaratively in JSX below;
+ * this function deliberately stays out of React state to keep the
+ * sync-first cold-load path obvious.
+ */
+function applyScheme(scheme: ColorScheme): void {
+  document.documentElement.classList.toggle("dark", scheme === "dark");
+  document.documentElement.dataset["colorScheme"] = scheme;
+}
+
 export function IframeApp() {
   const [mounted, dispatch] = useReducer(reducer, new Map<string, MountedCard>());
+  const [scheme, setScheme] = useState<ColorScheme>(readBootstrapScheme);
 
   useEffect(() => {
     async function handleMessage(event: MessageEvent<unknown>) {
@@ -225,6 +258,13 @@ export function IframeApp() {
         case "setPseudoState":
           dispatch({ type: "SET_PSEUDO_STATE", cardId: msg.cardId, state: msg.state });
           break;
+        case "setColorScheme":
+          // Apply imperatively so user component CSS reacts even before
+          // the host attribute change has propagated through React's
+          // commit; then update state so the host attribute follows.
+          applyScheme(msg.scheme);
+          setScheme(msg.scheme);
+          break;
       }
     }
 
@@ -235,7 +275,7 @@ export function IframeApp() {
   }, []);
 
   return (
-    <ChromeHost>
+    <ChromeHost colorScheme={scheme}>
       {(renderChrome) => {
         const cards = Array.from(mounted.values());
         return (
@@ -291,8 +331,16 @@ export function IframeApp() {
  * the root in state and tear nothing down on re-render.
  */
 function ChromeHost({
+  colorScheme,
   children,
 }: {
+  /**
+   * Resolved scheme literal driving the chrome's dark/light selectors
+   * via `:host([data-color-scheme="dark"])` inside the shadow tree.
+   * The shell owns the `Mode` (light/dark/system); the iframe only
+   * ever sees a resolved literal — see ColorScheme in types.ts.
+   */
+  colorScheme: ColorScheme;
   children: (renderChrome: (chrome: ReactNode) => ReactNode) => ReactNode;
 }) {
   const hostRef = useRef<HTMLDivElement | null>(null);
@@ -319,7 +367,7 @@ function ChromeHost({
   }
 
   return (
-    <div ref={hostRef} data-deloop-chrome-host>
+    <div ref={hostRef} data-deloop-chrome-host data-color-scheme={colorScheme}>
       {children(renderChrome)}
     </div>
   );
