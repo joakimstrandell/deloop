@@ -179,8 +179,16 @@ function listNamedExports(filePath: string, source: string): string[] {
 
     // `export { A, B as C }` and `export { A } from "./x"` — el.name is the
     // *exported* name (right-hand side of `as`).
+    //
+    // Type-only exports are filtered out: `export type { A, B }` disappears
+    // at runtime, so surfacing them as sidebar entries would produce
+    // unrenderable components. Both the whole-declaration form
+    // (`stmt.isTypeOnly`) and the per-specifier form (`el.isTypeOnly` for
+    // `export { type A, B }`) are skipped.
     if (ts.isExportDeclaration(stmt) && stmt.exportClause && ts.isNamedExports(stmt.exportClause)) {
+      if (stmt.isTypeOnly) continue;
       for (const el of stmt.exportClause.elements) {
+        if (el.isTypeOnly) continue;
         seen.add(el.name.text);
       }
       continue;

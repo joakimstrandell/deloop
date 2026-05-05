@@ -127,6 +127,25 @@ describe("discoverComponents — strict shim-only (default)", () => {
     expect(result.map((c) => c.name)).toEqual(["Button"]);
   });
 
+  it("ignores 'export type { ... }' declarations", async () => {
+    // Type-only exports disappear at runtime, so surfacing them as sidebar
+    // entries would produce unrenderable components (the iframe resolver
+    // would throw "no named export"). They must be filtered out.
+    root = makeProject({
+      "src/components/typed.deloop.tsx": `export type { ButtonProps } from "./button";\nexport function Real() { return null; }\n`,
+    });
+    const result = await discoverComponents(root);
+    expect(result.map((c) => c.name)).toEqual(["Real"]);
+  });
+
+  it("ignores 'type' specifiers within a mixed 'export { ... }'", async () => {
+    root = makeProject({
+      "src/components/mixed.deloop.tsx": `export { type Bar, Baz } from "./other";\n`,
+    });
+    const result = await discoverComponents(root);
+    expect(result.map((c) => c.name)).toEqual(["Baz"]);
+  });
+
   it("dedupes identical export identifiers within a single shim", async () => {
     // Malformed but should not crash. TypeScript would error at typecheck
     // time, but discovery must remain robust on user input.
