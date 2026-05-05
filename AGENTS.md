@@ -41,9 +41,10 @@ When CPO and CTO judgment conflict, surface it explicitly ("as CPO I'd ship X; a
 ## Session Hygiene
 
 - **Reflect-then-clear after each merge.** After merge: update Linear with completion notes; capture any surprises/patterns per the rule below; then `/clear` before next `/kickoff`. Each kickoff runs cold.
+- **Pre-spawn handoff (post-grill, pre-spawn `/clear`).** Grilling is the heaviest context phase of `/kickoff`. After the decision gate, before spawning the Implementer, CPTO updates Linear with the refined AC and locked decisions, writes a self-contained Implementer spawn prompt to `.claude/handoffs/<ISSUE_ID>.md` (gitignored), and advises the CEO to `/clear`. The CEO then re-invokes `/kickoff <ISSUE_ID>`; the cold CPTO detects the existing handoff file and jumps straight to the spawn phase. Linear + the handoff file are the durable record. Spawn → review → arbitrate → merge runs in a fresh context.
 - **Lessons from issue cycles** go to a playbook PR (this `AGENTS.md`, `docs/agent/*.md`) if codifiable as a rule, or a Linear comment if it's project-state context. Never a personal memory file. If neither bar is met, drop it.
 - **150k context threshold.** If the main session crosses ~150k tokens before a natural reflect-and-clear point, finish the current cycle, then reflect-and-clear. Do not interrupt mid-cycle.
-- **Cold-start recovery.** On every cold start (new session, post-`/clear`, after crash), CPTO runs `/resume` before accepting new instructions. Source of truth for recovery: Linear status + git worktrees + GitHub PR threads (especially `CPTO arbitration:` and `Mode: autonomous` comments).
+- **Cold-start recovery.** On every cold start (new session, post-`/clear`, after crash), CPTO runs `/resume` before accepting new instructions. Source of truth for recovery: Linear status + git worktrees + GitHub PR threads (especially `CPTO arbitration:` and `Mode: autonomous` comments) + handoff files in `.claude/handoffs/`.
 - **Strategic flows follow the same discipline.** PRD updates, roadmap planning, milestone setup, issue creation: ad-hoc by default but use the same reflect-and-clear cadence.
 
 ## Contract Source of Truth

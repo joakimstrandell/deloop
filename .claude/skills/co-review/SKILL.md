@@ -70,7 +70,8 @@ After merge:
 1. Sync local main: `git checkout main && git pull --ff-only`.
 2. Delete the local branch: `git branch -d <branch>`.
 3. Remove the worktree: `git worktree remove <path>`.
-4. Update Linear: status → `Done`, paste a one-line completion note linking the merge commit.
+4. Delete the pre-spawn handoff if it exists: `rm -f .claude/handoffs/<ISSUE_ID>.md`.
+5. Update Linear: status → `Done`, paste a one-line completion note linking the merge commit.
 
 ## Phase 5 — Reflect-and-clear
 
