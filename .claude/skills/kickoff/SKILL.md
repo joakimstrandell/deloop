@@ -23,6 +23,7 @@ Update Linear with refinements (tightened AC, decomposed scope, notes). Split th
 ## Phase 3 — Decision gate
 
 Confirm before spawning:
+
 - Linear issue ID (`AWK-XX`)
 - Mode (manual / autonomous)
 - Worktree (isolated default)
@@ -51,6 +52,7 @@ If autonomous: as soon as the Implementer reports the PR URL, post a one-line co
 ## Phase 6 — Chain into review
 
 After Implementer reports PR URL:
+
 1. Update Linear: status → `In Review`, link PR.
 2. Invoke the `/co-review` skill flow with: PR URL, worktree path, Linear issue ID, mode.
 
@@ -59,6 +61,7 @@ After Implementer reports PR URL:
 ## Circuit breakers (autonomous mode pauses and asks CEO)
 
 Pause and ask the CEO when:
+
 - Scope ambiguity unresolvable from issue context.
 - About to take a destructive operation outside the standard merge flow.
 - A must-fix finding where CEO acceptance is uncertain.

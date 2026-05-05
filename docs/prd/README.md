@@ -1,11 +1,11 @@
 # PRDs
 
-Vertical-slice PRDs for Deloop. Each PRD describes *what* and *why* for a coherent product initiative; *how* lives in `docs/plans/`, decision rationale lives in `docs/adr/`.
+Vertical-slice PRDs for Deloop. Each PRD describes _what_ and _why_ for a coherent product initiative; _how_ lives in `docs/plans/`, decision rationale lives in `docs/adr/`.
 
 ## Active
 
-| File | Status | Scope |
-| ---- | ------ | ----- |
+| File                           | Status     | Scope                                                         |
+| ------------------------------ | ---------- | ------------------------------------------------------------- |
 | [foundation.md](foundation.md) | Draft (v0) | Application vision, problem, core concepts, P0 spatial canvas |
 
 ## Conventions
@@ -26,10 +26,16 @@ Updated: YYYY-MM-DD
 Linear: <milestone or initiative link, if any>
 
 ## Problem
+
 ## Goals
+
 ## Non-goals
+
 ## Scope
+
 ## Success criteria
+
 ## Open questions
+
 ## Linked ADRs / Plans
 ```
