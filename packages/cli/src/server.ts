@@ -1,6 +1,5 @@
 import { createServer as createHttpServer } from "node:http";
 import { exec } from "node:child_process";
-import { existsSync } from "node:fs";
 import express, { type Response } from "express";
 import {
   createViteComponentServer,
@@ -42,8 +41,10 @@ export async function startServer({ root, port, open }: ServerOptions): Promise<
   );
 
   const style = resolveCanvasStyleConfig(root, config.styles, config.componentsDir);
-  if (style.cssPath != null) {
-    console.log(`[deloop] Loading canvas styles from ${style.cssPath}`);
+  if (style.cssPaths.length > 0) {
+    console.log(`[deloop] Loading canvas styles from ${style.cssPaths.join(", ")}`);
+  } else {
+    warnNoCssResolved();
   }
 
   const vite = await createViteComponentServer(root, style);
@@ -140,38 +141,58 @@ export async function startServer({ root, port, open }: ServerOptions): Promise<
  * Resolves the canvas-iframe style environment from the loaded config.
  *
  * Probes (in order):
- *   1. User-supplied `styles` from `.deloop/config.ts` (if it exists on disk).
- *   2. Conventional auto-detect paths (`src/styles/globals.css`, etc.).
- *
- * Missing files at either step yield `cssPath: null` — no CSS is injected.
- * This is silent on purpose: a 404 on the `<link>` is enough feedback
- * during development.
+ *   1. User-supplied `styles` from `.deloop/config.ts` — accepts either
+ *      a single string or an array of strings. Each entry is resolved to
+ *      an absolute path; per-entry existence is NOT pre-validated.
+ *      Missing paths still get a `<link>` injected so the resulting 404
+ *      becomes the user's signal. (Compare: when the user configured
+ *      *nothing*, there's no link to 404 on, so we fall through to
+ *      auto-detect and ultimately the warn-once path in
+ *      {@link startServer}.)
+ *   2. Conventional auto-detect paths (`src/styles/globals.css`, etc.) —
+ *      only consulted when `styles` is undefined. Auto-detect stays
+ *      single-only by design; opt into multiple entries via explicit
+ *      config.
  *
  * `componentsDir` is resolved to an absolute path only when the user has
  * configured it; auto-detect does not touch this field.
  */
-function resolveCanvasStyleConfig(
+export function resolveCanvasStyleConfig(
   projectRoot: string,
-  configuredStyles: string | undefined,
+  configuredStyles: string | string[] | undefined,
   configuredComponentsDir: string | undefined,
 ): CanvasStyleConfig {
-  let cssPath: string | null = null;
-  if (configuredStyles != null) {
-    const candidate = resolveUserPath(projectRoot, configuredStyles);
-    if (existsSync(candidate)) {
-      cssPath = candidate;
-    }
+  let cssPaths: string[] = [];
+  if (configuredStyles !== undefined) {
+    const entries = Array.isArray(configuredStyles) ? configuredStyles : [configuredStyles];
+    cssPaths = entries.map((entry) => resolveUserPath(projectRoot, entry));
   } else {
     const detected = autoDetectStylesPath(projectRoot);
     if (detected != null) {
-      cssPath = resolveUserPath(projectRoot, detected);
+      cssPaths = [resolveUserPath(projectRoot, detected)];
     }
   }
 
   const componentsDir =
     configuredComponentsDir != null ? resolveUserPath(projectRoot, configuredComponentsDir) : null;
 
-  return { cssPath, componentsDir };
+  return { cssPaths, componentsDir };
+}
+
+/**
+ * Emits the "no CSS resolved" warning to stderr.
+ *
+ * Called once at dev-server startup when neither explicit `styles`
+ * config nor auto-detect surfaced any CSS — components will render
+ * against browser defaults, which is almost never what the user wants.
+ * The message names a config field so the fix is one paste away.
+ *
+ * Exported so tests can invoke it directly without spinning a server.
+ */
+export function warnNoCssResolved(): void {
+  process.stderr.write(
+    "[deloop] No CSS entry found. Components will render without your design system. Set 'styles' in .deloop/config.ts (e.g. styles: 'src/styles/globals.css').\n",
+  );
 }
 
 // Express response close + abort handlers — both needed because clients can

@@ -105,6 +105,31 @@ test.describe("canvas rendering", () => {
     expect(userComponentPlacement.shadowContainsUserButton).toBe(false);
   });
 
+  test("injects exactly one <link data-deloop-user-css> tag for the dogfood single-source styles", async ({
+    page,
+  }) => {
+    // AWK-13 cycle 2: the dogfood project (packages/ui) auto-detects a
+    // single CSS entry (src/styles/globals.css). The plugin should inject
+    // exactly one <link data-deloop-user-css> into the iframe's <head>.
+    // The single-string config path runs through the same code as
+    // auto-detect, so this assertion covers both. The array form is
+    // covered by the unit tests in vite-component-server.test.ts.
+    await page.goto("/");
+
+    await expect(page.getByRole("button", { name: "Button", exact: true })).toBeVisible({
+      timeout: 10_000,
+    });
+    await page.getByRole("button", { name: "Button", exact: true }).click();
+
+    const canvas = page.frameLocator("iframe#canvas");
+    await expect(canvas.getByRole("button", { name: "Button" })).toBeVisible({ timeout: 10_000 });
+
+    const linkCount = await page
+      .frame({ url: /iframe\.html/ })!
+      .evaluate(() => document.head.querySelectorAll("link[data-deloop-user-css]").length);
+    expect(linkCount).toBe(1);
+  });
+
   test("clicking Tooltip mounts a fully composed tooltip without console errors", async ({
     page,
   }) => {

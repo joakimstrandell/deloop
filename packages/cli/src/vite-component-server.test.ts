@@ -1,4 +1,7 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, afterEach } from "vitest";
+import { mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
 import { canvasStyleEnvironmentPlugin, resolveUserPath } from "./vite-component-server.js";
 import type { Plugin } from "vite";
 
@@ -49,9 +52,9 @@ const fakeIndexHtmlContext = (filename: string) => ({
 });
 
 describe("canvasStyleEnvironmentPlugin — transformIndexHtml", () => {
-  it("injects a <link> into iframe.html when cssPath is set", async () => {
+  it("injects a <link> into iframe.html when one cssPath is set", async () => {
     const plugin = canvasStyleEnvironmentPlugin({
-      cssPath: "/abs/path/to/user/globals.css",
+      cssPaths: ["/abs/path/to/user/globals.css"],
       componentsDir: null,
     });
 
@@ -69,9 +72,41 @@ describe("canvasStyleEnvironmentPlugin — transformIndexHtml", () => {
     expect(result.indexOf("data-deloop-user-css")).toBeLessThan(result.indexOf("</head>"));
   });
 
+  it("injects N <link> tags in array order for multi-source styles", async () => {
+    const plugin = canvasStyleEnvironmentPlugin({
+      cssPaths: [
+        "/abs/path/to/user/design-system.css",
+        "/abs/path/to/user/overrides.css",
+        "/abs/path/to/user/local.css",
+      ],
+      componentsDir: null,
+    });
+
+    const handler = getTransformIndexHtmlHandler(plugin);
+    const html = `<!doctype html><html><head></head><body></body></html>`;
+    const result = (await handler.call(
+      {},
+      html,
+      fakeIndexHtmlContext("/repo/packages/app/iframe.html"),
+    )) as string;
+
+    // One <link> per entry, all marked with the data attr for traceability.
+    expect((result.match(/data-deloop-user-css/g) ?? []).length).toBe(3);
+    // Order is preserved verbatim — earliest entry first, latest last so
+    // it wins on cascade tie.
+    const dsIdx = result.indexOf("design-system.css");
+    const ovIdx = result.indexOf("overrides.css");
+    const lcIdx = result.indexOf("local.css");
+    expect(dsIdx).toBeGreaterThan(-1);
+    expect(ovIdx).toBeGreaterThan(dsIdx);
+    expect(lcIdx).toBeGreaterThan(ovIdx);
+    // All three land inside <head>.
+    expect(lcIdx).toBeLessThan(result.indexOf("</head>"));
+  });
+
   it("does not modify the shell index.html", async () => {
     const plugin = canvasStyleEnvironmentPlugin({
-      cssPath: "/abs/path/to/user/globals.css",
+      cssPaths: ["/abs/path/to/user/globals.css"],
       componentsDir: null,
     });
 
@@ -86,8 +121,8 @@ describe("canvasStyleEnvironmentPlugin — transformIndexHtml", () => {
     expect(result).toBe(html);
   });
 
-  it("is a no-op when cssPath is null", async () => {
-    const plugin = canvasStyleEnvironmentPlugin({ cssPath: null, componentsDir: null });
+  it("is a no-op when cssPaths is empty", async () => {
+    const plugin = canvasStyleEnvironmentPlugin({ cssPaths: [], componentsDir: null });
 
     const handler = getTransformIndexHtmlHandler(plugin);
     const html = `<!doctype html><html><head></head><body></body></html>`;
@@ -102,7 +137,7 @@ describe("canvasStyleEnvironmentPlugin — transformIndexHtml", () => {
 
   it("escapes attribute-unsafe characters in the href", async () => {
     const plugin = canvasStyleEnvironmentPlugin({
-      cssPath: '/abs/path/has "quote".css',
+      cssPaths: ['/abs/path/has "quote".css'],
       componentsDir: null,
     });
 
@@ -116,11 +151,28 @@ describe("canvasStyleEnvironmentPlugin — transformIndexHtml", () => {
 });
 
 describe("canvasStyleEnvironmentPlugin — transform", () => {
-  const cssPath = "/abs/path/to/user/globals.css";
+  let tmpRoot: string;
   const componentsDir = "/abs/path/to/user/src/components";
 
+  function makeTmp(): string {
+    return join(tmpdir(), `deloop-vite-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+  }
+
+  function writeCss(root: string, name: string, contents: string): string {
+    mkdirSync(root, { recursive: true });
+    const path = join(root, name);
+    writeFileSync(path, contents, "utf8");
+    return path;
+  }
+
+  afterEach(() => {
+    if (tmpRoot) rmSync(tmpRoot, { recursive: true, force: true });
+  });
+
   it("prepends @source for the user CSS when componentsDir is set", async () => {
-    const plugin = canvasStyleEnvironmentPlugin({ cssPath, componentsDir });
+    tmpRoot = makeTmp();
+    const cssPath = writeCss(tmpRoot, "globals.css", `body { color: red; }`);
+    const plugin = canvasStyleEnvironmentPlugin({ cssPaths: [cssPath], componentsDir });
     const handler = getTransformHandler(plugin);
 
     const result = await handler.call({}, `body { color: red; }`, cssPath);
@@ -131,7 +183,9 @@ describe("canvasStyleEnvironmentPlugin — transform", () => {
   });
 
   it("matches the CSS file even when Vite appends a query string", async () => {
-    const plugin = canvasStyleEnvironmentPlugin({ cssPath, componentsDir });
+    tmpRoot = makeTmp();
+    const cssPath = writeCss(tmpRoot, "globals.css", `body {}`);
+    const plugin = canvasStyleEnvironmentPlugin({ cssPaths: [cssPath], componentsDir });
     const handler = getTransformHandler(plugin);
 
     const result = await handler.call({}, `body {}`, `${cssPath}?direct`);
@@ -140,7 +194,9 @@ describe("canvasStyleEnvironmentPlugin — transform", () => {
   });
 
   it("is a no-op for files other than the resolved user CSS", async () => {
-    const plugin = canvasStyleEnvironmentPlugin({ cssPath, componentsDir });
+    tmpRoot = makeTmp();
+    const cssPath = writeCss(tmpRoot, "globals.css", `body {}`);
+    const plugin = canvasStyleEnvironmentPlugin({ cssPaths: [cssPath], componentsDir });
     const handler = getTransformHandler(plugin);
 
     const result = await handler.call({}, `body {}`, "/abs/path/to/other.css");
@@ -149,7 +205,15 @@ describe("canvasStyleEnvironmentPlugin — transform", () => {
   });
 
   it("respects an existing @source directive in the user's CSS", async () => {
-    const plugin = canvasStyleEnvironmentPlugin({ cssPath, componentsDir });
+    tmpRoot = makeTmp();
+    // The file already declares @source; pickPrependTarget should skip
+    // it, so nothing matches at transform time.
+    const cssPath = writeCss(
+      tmpRoot,
+      "globals.css",
+      `@import "tailwindcss";\n@source "./components";\nbody {}`,
+    );
+    const plugin = canvasStyleEnvironmentPlugin({ cssPaths: [cssPath], componentsDir });
     const handler = getTransformHandler(plugin);
 
     const result = await handler.call(
@@ -162,7 +226,9 @@ describe("canvasStyleEnvironmentPlugin — transform", () => {
   });
 
   it("is a no-op when componentsDir is null", async () => {
-    const plugin = canvasStyleEnvironmentPlugin({ cssPath, componentsDir: null });
+    tmpRoot = makeTmp();
+    const cssPath = writeCss(tmpRoot, "globals.css", `body {}`);
+    const plugin = canvasStyleEnvironmentPlugin({ cssPaths: [cssPath], componentsDir: null });
     const handler = getTransformHandler(plugin);
 
     const result = await handler.call({}, `body {}`, cssPath);
@@ -170,13 +236,75 @@ describe("canvasStyleEnvironmentPlugin — transform", () => {
     expect(result).toBeNull();
   });
 
-  it("is a no-op when cssPath is null", async () => {
-    const plugin = canvasStyleEnvironmentPlugin({ cssPath: null, componentsDir });
+  it("is a no-op when cssPaths is empty", async () => {
+    const plugin = canvasStyleEnvironmentPlugin({ cssPaths: [], componentsDir });
     const handler = getTransformHandler(plugin);
 
-    const result = await handler.call({}, `body {}`, cssPath);
+    const result = await handler.call({}, `body {}`, "/anything.css");
 
     expect(result).toBeNull();
+  });
+
+  it("prepends @source on the first entry that lacks @source, not subsequent entries", async () => {
+    // Multi-source: first entry has no @source → it gets the prepend.
+    // Second entry is a plain override and is left alone, even though
+    // it also lacks @source.
+    tmpRoot = makeTmp();
+    const dsPath = writeCss(tmpRoot, "design-system.css", `body { color: red; }`);
+    const overridePath = writeCss(tmpRoot, "overrides.css", `body { color: blue; }`);
+    const plugin = canvasStyleEnvironmentPlugin({
+      cssPaths: [dsPath, overridePath],
+      componentsDir,
+    });
+    const handler = getTransformHandler(plugin);
+
+    const dsResult = await handler.call({}, `body { color: red; }`, dsPath);
+    const ovResult = await handler.call({}, `body { color: blue; }`, overridePath);
+
+    expect(dsResult).not.toBeNull();
+    if (dsResult == null) throw new Error("expected design-system result");
+    expect(dsResult.code).toBe(`@source "${componentsDir}";\nbody { color: red; }`);
+    // The second entry is intentionally untouched.
+    expect(ovResult).toBeNull();
+  });
+
+  it("skips an entry that already declares @source and lands the prepend on the next entry without one", async () => {
+    tmpRoot = makeTmp();
+    const dsPath = writeCss(
+      tmpRoot,
+      "design-system.css",
+      `@import "tailwindcss";\n@source "./components";\nbody {}`,
+    );
+    const overridePath = writeCss(tmpRoot, "overrides.css", `body { color: blue; }`);
+    const plugin = canvasStyleEnvironmentPlugin({
+      cssPaths: [dsPath, overridePath],
+      componentsDir,
+    });
+    const handler = getTransformHandler(plugin);
+
+    const dsResult = await handler.call({}, `@source "./components";\nbody {}`, dsPath);
+    const ovResult = await handler.call({}, `body { color: blue; }`, overridePath);
+
+    // First entry already has @source — left alone.
+    expect(dsResult).toBeNull();
+    // Second entry is the first-without-@source — gets the prepend.
+    expect(ovResult).not.toBeNull();
+    if (ovResult == null) throw new Error("expected override result");
+    expect(ovResult.code).toBe(`@source "${componentsDir}";\nbody { color: blue; }`);
+  });
+
+  it("does not prepend on any entry when every entry already has @source", async () => {
+    tmpRoot = makeTmp();
+    const aPath = writeCss(tmpRoot, "a.css", `@source "./a";\nbody {}`);
+    const bPath = writeCss(tmpRoot, "b.css", `@source "./b";\nbody {}`);
+    const plugin = canvasStyleEnvironmentPlugin({
+      cssPaths: [aPath, bPath],
+      componentsDir,
+    });
+    const handler = getTransformHandler(plugin);
+
+    expect(await handler.call({}, `@source "./a";\nbody {}`, aPath)).toBeNull();
+    expect(await handler.call({}, `@source "./b";\nbody {}`, bPath)).toBeNull();
   });
 });
 
