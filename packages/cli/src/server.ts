@@ -1,9 +1,14 @@
 import { createServer as createHttpServer } from "node:http";
 import { exec } from "node:child_process";
+import { existsSync } from "node:fs";
 import express, { type Response } from "express";
-import { createViteComponentServer } from "./vite-component-server.js";
+import {
+  createViteComponentServer,
+  resolveUserPath,
+  type CanvasStyleConfig,
+} from "./vite-component-server.js";
 import { createComponentRegistry } from "./component-watcher.js";
-import { loadDeloopConfig } from "./config-loader.js";
+import { autoDetectStylesPath, loadDeloopConfig } from "./config-loader.js";
 import { bootstrapDeloopDir } from "./bootstrap.js";
 
 export interface ServerOptions {
@@ -36,7 +41,12 @@ export async function startServer({ root, port, open }: ServerOptions): Promise<
     config.components !== undefined ? { components: config.components } : {},
   );
 
-  const vite = await createViteComponentServer(root);
+  const style = resolveCanvasStyleConfig(root, config.styles, config.componentsDir);
+  if (style.cssPath != null) {
+    console.log(`[deloop] Loading canvas styles from ${style.cssPath}`);
+  }
+
+  const vite = await createViteComponentServer(root, style);
 
   // REST API — first paint of the sidebar reads this once. Subsequent
   // updates flow through the SSE channel below.
@@ -124,6 +134,44 @@ export async function startServer({ root, port, open }: ServerOptions): Promise<
   httpServer.on("close", () => {
     void shutdown();
   });
+}
+
+/**
+ * Resolves the canvas-iframe style environment from the loaded config.
+ *
+ * Probes (in order):
+ *   1. User-supplied `styles` from `.deloop/config.ts` (if it exists on disk).
+ *   2. Conventional auto-detect paths (`src/styles/globals.css`, etc.).
+ *
+ * Missing files at either step yield `cssPath: null` — no CSS is injected.
+ * This is silent on purpose: a 404 on the `<link>` is enough feedback
+ * during development.
+ *
+ * `componentsDir` is resolved to an absolute path only when the user has
+ * configured it; auto-detect does not touch this field.
+ */
+function resolveCanvasStyleConfig(
+  projectRoot: string,
+  configuredStyles: string | undefined,
+  configuredComponentsDir: string | undefined,
+): CanvasStyleConfig {
+  let cssPath: string | null = null;
+  if (configuredStyles != null) {
+    const candidate = resolveUserPath(projectRoot, configuredStyles);
+    if (existsSync(candidate)) {
+      cssPath = candidate;
+    }
+  } else {
+    const detected = autoDetectStylesPath(projectRoot);
+    if (detected != null) {
+      cssPath = resolveUserPath(projectRoot, detected);
+    }
+  }
+
+  const componentsDir =
+    configuredComponentsDir != null ? resolveUserPath(projectRoot, configuredComponentsDir) : null;
+
+  return { cssPath, componentsDir };
 }
 
 // Express response close + abort handlers — both needed because clients can

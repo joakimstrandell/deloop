@@ -2,7 +2,7 @@ import { describe, it, expect, afterEach, vi } from "vitest";
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { loadDeloopConfig } from "./config-loader.js";
+import { autoDetectStylesPath, loadDeloopConfig } from "./config-loader.js";
 
 let root: string;
 
@@ -60,6 +60,48 @@ describe("loadDeloopConfig", () => {
     expect(result?.components).toEqual(["src/widgets", "src/forms"]);
   });
 
+  it("normalizes the styles field as a single CSS entry path", async () => {
+    root = makeRoot();
+    mkdirSync(join(root, ".deloop"), { recursive: true });
+    writeFileSync(
+      join(root, ".deloop/config.ts"),
+      `export default { styles: "src/styles/app.css" };\n`,
+      "utf8",
+    );
+
+    const result = await loadDeloopConfig(root);
+
+    expect(result).toEqual({ styles: "src/styles/app.css" });
+  });
+
+  it("normalizes the componentsDir field as a single directory path", async () => {
+    root = makeRoot();
+    mkdirSync(join(root, ".deloop"), { recursive: true });
+    writeFileSync(
+      join(root, ".deloop/config.ts"),
+      `export default { componentsDir: "src/components" };\n`,
+      "utf8",
+    );
+
+    const result = await loadDeloopConfig(root);
+
+    expect(result).toEqual({ componentsDir: "src/components" });
+  });
+
+  it("drops styles and componentsDir when not strings", async () => {
+    root = makeRoot();
+    mkdirSync(join(root, ".deloop"), { recursive: true });
+    writeFileSync(
+      join(root, ".deloop/config.ts"),
+      `export default { styles: 42, componentsDir: ["a"] };\n`,
+      "utf8",
+    );
+
+    const result = await loadDeloopConfig(root);
+
+    expect(result).toEqual({});
+  });
+
   describe("malformed user config", () => {
     it("returns null and warns when the config has a syntax error", async () => {
       root = makeRoot();
@@ -99,5 +141,38 @@ describe("loadDeloopConfig", () => {
         warn.mockRestore();
       }
     });
+  });
+});
+
+describe("autoDetectStylesPath", () => {
+  it("returns null when no conventional CSS entry exists", () => {
+    root = makeRoot();
+    mkdirSync(root, { recursive: true });
+    expect(autoDetectStylesPath(root)).toBeNull();
+  });
+
+  it("prefers src/styles/globals.css over other candidates", () => {
+    root = makeRoot();
+    mkdirSync(join(root, "src/styles"), { recursive: true });
+    writeFileSync(join(root, "src/styles/globals.css"), "/* a */", "utf8");
+    writeFileSync(join(root, "src/styles/index.css"), "/* b */", "utf8");
+
+    expect(autoDetectStylesPath(root)).toBe("src/styles/globals.css");
+  });
+
+  it("falls back to src/index.css when styles directory is absent", () => {
+    root = makeRoot();
+    mkdirSync(join(root, "src"), { recursive: true });
+    writeFileSync(join(root, "src/index.css"), "/* c */", "utf8");
+
+    expect(autoDetectStylesPath(root)).toBe("src/index.css");
+  });
+
+  it("walks all candidates in declared order", () => {
+    root = makeRoot();
+    mkdirSync(join(root, "src"), { recursive: true });
+    writeFileSync(join(root, "src/styles.css"), "/* d */", "utf8");
+
+    expect(autoDetectStylesPath(root)).toBe("src/styles.css");
   });
 });

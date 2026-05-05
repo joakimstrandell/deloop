@@ -1,20 +1,15 @@
 /*
-  Canvas iframe styles — loaded inside the isolated canvas document.
+  Canvas iframe baseline reset.
 
-  @import "tailwindcss" gives the canvas a full Tailwind environment so that
-  components from @deloop/ui (and any user project that uses Tailwind) render
-  correctly. The canvas is a separate browser document from the shell — no
-  styles leak between them.
+  No Tailwind, no shadcn tokens, no `@source` — Deloop's canvas chrome
+  lives inside a shadow root (see IframeApp.tsx, AWK-13) and the user's
+  project CSS is loaded into the iframe's <head> via a Vite-injected
+  <link> tag (see packages/cli/src/vite-component-server.ts).
 
-  Later: user project style entry points (global CSS, font imports, CSS custom
-  properties) will also be injected here based on .deloop/config.ts.
+  Keeping this file gives us a tiny browser-default reset so the canvas
+  doesn't show the default 8px body margin around the chrome host before
+  the user's CSS (if any) loads.
 */
-@import "tailwindcss";
-
-/* Tailwind v4 excludes node_modules from scanning by default.
-   @deloop/ui is symlinked there, so we add its source explicitly. */
-@source "../../../ui/src";
-
 html,
 body {
   margin: 0;

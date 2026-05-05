@@ -6,9 +6,10 @@ import { tsImport } from "tsx/esm/api";
 /**
  * The shape exported by `.deloop/config.ts`.
  *
- * Kept intentionally narrow: only the `components` field is recognized
- * today. Future fields should be added here and validated in
- * `loadDeloopConfig` so unknown values surface clearly.
+ * Kept intentionally narrow: only fields recognized today are retained;
+ * unknown fields are silently dropped by `normalizeConfig`. New fields
+ * should be added here and validated below so unknown values surface
+ * clearly.
  */
 export interface DeloopConfig {
   /**
@@ -16,7 +17,37 @@ export interface DeloopConfig {
    * (e.g. `"src/widgets"`) or an explicit glob (e.g. `"src/**\/*.tsx"`).
    */
   components?: string[];
+  /**
+   * Single CSS entry for the canvas iframe, relative to the user project
+   * root (e.g. `"src/styles/globals.css"`). Loaded as the user's design
+   * environment so components render with their real tokens, fonts, and
+   * Tailwind utilities. When absent, Deloop probes a small set of known
+   * conventional paths via {@link autoDetectStylesPath}.
+   */
+  styles?: string;
+  /**
+   * Directory of component sources to scan for Tailwind class usage when
+   * the user's input CSS does not already declare an `@source` directive.
+   * Relative to the user project root. Injected as
+   * `@source "<absolute-componentsDir>";` prepended to the served CSS so
+   * Tailwind v4 generates utilities for those files even without a user
+   * `@source`.
+   */
+  componentsDir?: string;
 }
+
+/**
+ * Conventional CSS entry paths probed in order when the user has no
+ * `styles` field. The first existing path wins. If none match, no CSS is
+ * loaded — there is no warning, by design.
+ */
+const STYLES_AUTO_DETECT_PATHS = [
+  "src/styles/globals.css",
+  "src/styles/index.css",
+  "src/globals.css",
+  "src/index.css",
+  "src/styles.css",
+] as const;
 
 /**
  * Loads the user's `.deloop/config.ts`.
@@ -63,6 +94,21 @@ export async function loadDeloopConfig(projectRoot: string): Promise<DeloopConfi
   return normalizeConfig(exported as Record<string, unknown>);
 }
 
+/**
+ * Probes for a conventional CSS entry under `projectRoot` when the user
+ * has not configured `styles` explicitly. Returns the first existing path
+ * in {@link STYLES_AUTO_DETECT_PATHS} as a project-relative string, or
+ * `null` if none match (in which case the canvas loads no user CSS).
+ */
+export function autoDetectStylesPath(projectRoot: string): string | null {
+  for (const candidate of STYLES_AUTO_DETECT_PATHS) {
+    if (existsSync(join(projectRoot, candidate))) {
+      return candidate;
+    }
+  }
+  return null;
+}
+
 function unwrapDefault(mod: Record<string, unknown>): unknown {
   // tsImport surfaces both `default` and a CJS interop layer; the user's
   // `export default {...}` sits at `mod.default.default`. Walk one level
@@ -81,6 +127,12 @@ function normalizeConfig(raw: Record<string, unknown>): DeloopConfig {
       (entry): entry is string => typeof entry === "string",
     );
     result.components = filtered;
+  }
+  if (typeof raw["styles"] === "string") {
+    result.styles = raw["styles"];
+  }
+  if (typeof raw["componentsDir"] === "string") {
+    result.componentsDir = raw["componentsDir"];
   }
   return result;
 }
