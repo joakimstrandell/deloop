@@ -40,7 +40,8 @@ When CPO and CTO judgment conflict, surface it explicitly ("as CPO I'd ship X; a
 
 ## Session Hygiene
 
-- **Reflect-then-clear after each merge.** After merge: write memory entries for surprises and emerging patterns; propose playbook PRs for any drift; update Linear with completion notes; then `/clear` before next `/kickoff`. Each kickoff runs cold.
+- **Reflect-then-clear after each merge.** After merge: update Linear with completion notes; capture any surprises/patterns per the rule below; then `/clear` before next `/kickoff`. Each kickoff runs cold.
+- **Lessons from issue cycles** go to a playbook PR (this `AGENTS.md`, `docs/agent/*.md`) if codifiable as a rule, or a Linear comment if it's project-state context. Never a personal memory file. If neither bar is met, drop it.
 - **150k context threshold.** If the main session crosses ~150k tokens before a natural reflect-and-clear point, finish the current cycle, then reflect-and-clear. Do not interrupt mid-cycle.
 - **Cold-start recovery.** On every cold start (new session, post-`/clear`, after crash), CPTO runs `/resume` before accepting new instructions. Source of truth for recovery: Linear status + git worktrees + GitHub PR threads (especially `CPTO arbitration:` and `Mode: autonomous` comments).
 - **Strategic flows follow the same discipline.** PRD updates, roadmap planning, milestone setup, issue creation: ad-hoc by default but use the same reflect-and-clear cadence.
@@ -64,15 +65,17 @@ When CPO and CTO judgment conflict, surface it explicitly ("as CPO I'd ship X; a
 - `/co-review` — Standalone review entry. CPTO spawns Reviewer in the existing worktree, arbitrates findings, cycles up to 2x, hands to merge step.
 - `/resume` — Cold-start recovery. Read-only by default. Scans Linear/git/GitHub, classifies in-flight issues, proposes resume actions.
 
-## Agent Playbooks
+## Documentation
 
-- Workflow and Linear usage: `docs/agent/workflow.md`
-- Testing strategy and required checks: `docs/agent/testing.md`
-- PR review process: `docs/agent/code-review.md`
-- ADR policy: `docs/agent/decision-records.md`
+- `README.md` — project intro for humans
+- `CONTEXT.md` — domain language and glossary (canonical)
+- this file (`AGENTS.md`) — agent rules, roles, orchestration
+- `docs/prd/` — product vision and feature PRDs
+- `docs/agent/workflow.md` — workflow and Linear usage
+- `docs/agent/testing.md` — testing strategy and required checks
+- `docs/agent/code-review.md` — PR review process
+- `docs/agent/decision-records.md` — ADR policy
+- `docs/adr/` — architectural decisions
+- `docs/plans/` — implementation plans (rare)
 
-## Terminology
-
-- **Shell**: outer UI wrapper in `packages/app/src/shell/`.
-- **Canvas iframe**: isolated rendering document in `packages/app/src/iframe/`.
-- **User project**: project Deloop runs against at runtime.
+Read on-demand when the topic is relevant. Do not preemptively read all files.

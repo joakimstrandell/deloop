@@ -72,10 +72,10 @@ After merge:
 
 Required after every merge, both modes:
 
-1. Reflect (write, don't just chat):
-   - Anything surprising? → memory entry under `~/.claude/projects/-Users-joakimstrandell-Projects-deloop/memory/`.
-   - Same friction surfaced twice? → propose a docs PR for the relevant playbook (drift check from `AGENTS.md`).
-   - Strategic / product thread to remember? → Linear comment or roadmap note.
+1. Reflect (write, don't just chat). For each surprise or pattern, pick the right home:
+   - Same friction surfaced twice, or a rule worth codifying? → propose a playbook PR (`AGENTS.md` or `docs/agent/*.md`). Project-level lessons live in checked-in docs, not memory files.
+   - Strategic / product thread to remember? → Linear comment on the consuming issue or initiative.
+   - Doesn't pass either bar? → drop it. Don't write a memory entry as a default catch-all.
 2. `/clear` before next `/kickoff`. Each new kickoff runs cold.
 
 ## Notes
