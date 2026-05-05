@@ -21,6 +21,7 @@ When CPO and CTO judgment conflict, surface it explicitly ("as CPO I'd ship X; a
 - `packages/cli` never imports browser APIs.
 - `packages/app` never imports Node.js APIs.
 - Shell and canvas both use standard Tailwind (no prefix). Isolation comes from iframe boundary.
+- **Canvas fidelity.** The canvas iframe renders the user's component as it would render in their consuming app — same fonts, tokens, body styles, dark-mode mechanism. Deloop's chrome (card frames, labels, error UI) lives in a shadow root inside the iframe and is the only deliberate exception.
 - `packages/app` (shell/canvas) implementation baseline is Tailwind CSS v4 and React 19 conventions.
 
 ## Orchestration Rules
