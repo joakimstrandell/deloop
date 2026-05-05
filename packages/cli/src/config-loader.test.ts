@@ -112,6 +112,64 @@ describe("loadDeloopConfig", () => {
     expect(result).toEqual({ styles: [] });
   });
 
+  it("collapses a blank styles string to an empty array (configured-but-empty)", async () => {
+    root = makeRoot();
+    mkdirSync(join(root, ".deloop"), { recursive: true });
+    writeFileSync(join(root, ".deloop/config.ts"), `export default { styles: "" };\n`, "utf8");
+
+    const result = await loadDeloopConfig(root);
+
+    expect(result).toEqual({ styles: [] });
+  });
+
+  it("collapses a whitespace-only styles string to an empty array", async () => {
+    root = makeRoot();
+    mkdirSync(join(root, ".deloop"), { recursive: true });
+    writeFileSync(join(root, ".deloop/config.ts"), `export default { styles: "   " };\n`, "utf8");
+
+    const result = await loadDeloopConfig(root);
+
+    expect(result).toEqual({ styles: [] });
+  });
+
+  it("collapses a styles array of one blank entry to an empty array", async () => {
+    root = makeRoot();
+    mkdirSync(join(root, ".deloop"), { recursive: true });
+    writeFileSync(join(root, ".deloop/config.ts"), `export default { styles: [""] };\n`, "utf8");
+
+    const result = await loadDeloopConfig(root);
+
+    expect(result).toEqual({ styles: [] });
+  });
+
+  it("filters blank entries out of a styles array", async () => {
+    root = makeRoot();
+    mkdirSync(join(root, ".deloop"), { recursive: true });
+    writeFileSync(
+      join(root, ".deloop/config.ts"),
+      `export default { styles: ["foo.css", "", "bar.css"] };\n`,
+      "utf8",
+    );
+
+    const result = await loadDeloopConfig(root);
+
+    expect(result).toEqual({ styles: ["foo.css", "bar.css"] });
+  });
+
+  it("filters whitespace-only entries out of a styles array", async () => {
+    root = makeRoot();
+    mkdirSync(join(root, ".deloop"), { recursive: true });
+    writeFileSync(
+      join(root, ".deloop/config.ts"),
+      `export default { styles: ["foo.css", "   ", "bar.css"] };\n`,
+      "utf8",
+    );
+
+    const result = await loadDeloopConfig(root);
+
+    expect(result).toEqual({ styles: ["foo.css", "bar.css"] });
+  });
+
   it("normalizes the componentsDir field as a single directory path", async () => {
     root = makeRoot();
     mkdirSync(join(root, ".deloop"), { recursive: true });

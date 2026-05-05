@@ -10,6 +10,7 @@ import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { resolveCanvasStyleConfig, warnNoCssResolved } from "./server.js";
+import { loadDeloopConfig } from "./config-loader.js";
 
 let root: string;
 
@@ -194,6 +195,24 @@ describe("resolveCanvasStyleConfig + warn integration (mirrors startServer's bra
     const style = resolveCanvasStyleConfig(root, [], undefined);
     if (style.cssPaths.length === 0) warnNoCssResolved();
 
+    expect(writeSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it("warns end-to-end when user config sets styles to an empty string (no /@fs/<root> link)", async () => {
+    // Boundary test: a blank-string `styles: ""` in user config should
+    // normalize to `[]` (configured-but-empty) and route through the
+    // warn-once branch — not produce a `<link href="/@fs/<root>">` that
+    // 404s. Threads `loadDeloopConfig` -> `resolveCanvasStyleConfig` to
+    // exercise the full path.
+    root = makeRoot();
+    mkdirSync(join(root, ".deloop"), { recursive: true });
+    writeFileSync(join(root, ".deloop/config.ts"), `export default { styles: "" };\n`, "utf8");
+
+    const config = await loadDeloopConfig(root);
+    const style = resolveCanvasStyleConfig(root, config?.styles, config?.componentsDir);
+    if (style.cssPaths.length === 0) warnNoCssResolved();
+
+    expect(style.cssPaths).toEqual([]);
     expect(writeSpy).toHaveBeenCalledTimes(1);
   });
 });

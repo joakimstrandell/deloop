@@ -134,14 +134,20 @@ function normalizeConfig(raw: Record<string, unknown>): DeloopConfig {
     result.components = filtered;
   }
   if (typeof raw["styles"] === "string") {
-    result.styles = raw["styles"];
+    // Empty / whitespace-only string is treated as "configured but empty"
+    // (per spec): collapse to `[]` so the no-CSS warn-once fires instead
+    // of injecting a `<link>` that resolves to the project root and 404s.
+    result.styles = raw["styles"].trim() === "" ? [] : raw["styles"];
   } else if (Array.isArray(raw["styles"])) {
-    // Filter out non-string entries — same "validate and drop" pattern
-    // we already use for `components`. An empty result (e.g. `[]` or
-    // `[42, true]`) is preserved as-is and will trigger the no-CSS warn
-    // at server start.
+    // Filter out non-string entries AND blank/whitespace-only entries —
+    // same "validate and drop" pattern as `components`, plus the blank
+    // collapse from the string case so a stray `""` in the middle of an
+    // otherwise-valid array doesn't 404 against the project root. An
+    // empty result (e.g. `[]`, `[""]`, `["   "]`, `[42, true]`) is
+    // preserved as `[]` and will trigger the no-CSS warn at server
+    // start.
     const filtered = (raw["styles"] as unknown[]).filter(
-      (entry): entry is string => typeof entry === "string",
+      (entry): entry is string => typeof entry === "string" && entry.trim() !== "",
     );
     result.styles = filtered;
   }
