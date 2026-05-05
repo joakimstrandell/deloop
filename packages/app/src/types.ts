@@ -16,9 +16,9 @@
  */
 
 export interface ComponentInfo {
-  /** Display name derived from the filename (e.g. "Button"). */
+  /** Display name — the verbatim identifier of a shim's named export. */
   name: string;
-  /** Absolute filesystem path to the component file. */
+  /** Absolute filesystem path to the shim file. */
   path: string;
   /** Path relative to the project root (for display). */
   relativePath: string;
@@ -44,10 +44,10 @@ export type ShellToIframeMessage =
        */
       componentPath: string;
       /**
-       * Export name to pull from the imported module. The iframe resolves the
-       * renderable as `mod[componentName] ?? mod.default`, which lets a
-       * component file ship a named export (e.g. `export function Button`)
-       * without also adding `export default`.
+       * Export name to pull from the imported module. The iframe resolves
+       * the renderable strictly as `mod[componentName]` (no default-export
+       * fallback) per the strict shim-only discovery model in ADR-0005.
+       * The named export must exist; missing exports throw a clear error.
        */
       componentName: string;
       /** Initial props passed to the component on first render. */

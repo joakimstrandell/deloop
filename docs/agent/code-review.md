@@ -33,22 +33,27 @@ Reviewer's first check. If missing or incomplete, that's a `must-fix`:
 
 ```md
 ## Linear issue
+
 AWK-XX: <title>
 
 ## Acceptance criteria coverage
+
 - [x] AC1 — verified by <test path or behavior reference>
 - [x] AC2 — verified by <test path or behavior reference>
 
 ## Decisions made
+
 - Chose X over Y because <reason>
 - Skipped Z (out of scope per issue)
 
 ## Test evidence
+
 <pnpm check output: pass>
 <pnpm test output: pass>
 <E2E output if relevant: pass>
 
 ## Risks / things to flag for review
+
 - <anything Implementer is unsure about>
 ```
 
@@ -60,6 +65,7 @@ Returned to CPTO as structured text. Must enable arbitration without re-reading 
 **Verdict**: ready | needs changes
 
 **Findings**:
+
 - [must-fix] <file>:<line> — <description>
   Impact: <why it matters>
   Suggested fix: <concrete suggestion>
@@ -74,11 +80,13 @@ Returned to CPTO as structured text. Must enable arbitration without re-reading 
 | AC3 | not covered | <gap> |
 
 **Test coverage assessment**:
+
 - Unit: <gaps>
 - Integration: <gaps>
 - E2E: <gaps>
 
 **Risks / regressions noted**:
+
 - ...
 
 **CI status**: green | red (<failing job>)

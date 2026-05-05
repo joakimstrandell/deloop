@@ -1,5 +1,6 @@
 import { type ComponentType, useEffect, useReducer } from "react";
 import { parseShellToIframeMessage } from "../protocol.js";
+import { resolveComponentExport } from "./resolve-component.js";
 import type { IframeToShellMessage, PseudoState } from "../types.js";
 
 interface MountedCard {
@@ -106,22 +107,7 @@ export function IframeApp() {
               string,
               unknown
             >;
-            // Resolution rule: prefer the named export matching the entry's
-            // name, fall back to default. This lets components ship as
-            // `export function Button` without also requiring a default.
-            const Component = mod[msg.componentName] ?? mod["default"];
-            // Plain function components are functions; React.forwardRef,
-            // React.memo, and React.lazy wrap them in objects (with a
-            // $$typeof symbol). Either shape is renderable; anything else
-            // (string, number, null) is not a valid component export.
-            if (
-              Component == null ||
-              (typeof Component !== "function" && typeof Component !== "object")
-            ) {
-              throw new Error(
-                `${msg.componentPath} has neither a named export "${msg.componentName}" nor a default export`,
-              );
-            }
+            const Component = resolveComponentExport(mod, msg.componentName, msg.componentPath);
             dispatch({
               type: "RESOLVED",
               cardId: msg.cardId,

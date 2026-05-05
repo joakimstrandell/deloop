@@ -2,9 +2,13 @@ node_modules/
 dist/
 .cache/
 
-# Deloop project state — gitignored by default (see ADR-0003)
-.deloop/canvas.json
-.deloop/dist/
+# Deloop project state — gitignored by default (see ADR-0003).
+# Patterns use `**/` so they match in nested user-project roots too — e.g.
+# `packages/ui/.deloop/` when Deloop is run against `packages/ui` from the
+# repo root during dogfooding.
+**/.deloop/canvas.json
+**/.deloop/config.ts
+**/.deloop/dist/
 
 # Editor and OS
 .DS_Store

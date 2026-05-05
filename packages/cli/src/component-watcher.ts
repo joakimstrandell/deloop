@@ -11,9 +11,8 @@ export interface ComponentRegistry {
   list(): Promise<ComponentInfo[]>;
   /**
    * Subscribes to discovery events — fired when the set of component entries
-   * changes on disk (file added or removed). Content edits do not fire this;
-   * those flow through Vite HMR to the canvas iframe instead. Returns an
-   * unsubscribe function.
+   * changes on disk (file added or removed, or a shim's named-export set
+   * changed). Returns an unsubscribe function.
    */
   subscribe(listener: (components: ComponentInfo[]) => void): () => void;
   /** Stops the underlying watcher and releases resources. */
@@ -35,6 +34,20 @@ function watchPathFor(projectRoot: string, source: string): string {
   return join(projectRoot, source);
 }
 
+/** Stable structural compare on a sorted ComponentInfo[]. */
+function componentsEqual(a: ComponentInfo[], b: ComponentInfo[]): boolean {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) {
+    const x = a[i];
+    const y = b[i];
+    if (!x || !y) return false;
+    if (x.name !== y.name || x.path !== y.path || x.relativePath !== y.relativePath) {
+      return false;
+    }
+  }
+  return true;
+}
+
 /**
  * Creates a component registry that re-discovers components when files in
  * the configured source directories change. The registry caches the last
@@ -42,10 +55,13 @@ function watchPathFor(projectRoot: string, source: string): string {
  * so callers (e.g. `/api/components`) always observe a fresh view.
  *
  * Subscribers (e.g. the SSE endpoint) receive a debounced notification with
- * the fresh list whenever the discoverable *set* changes — `add` or `unlink`.
- * `change` events invalidate the cache (a file's barrel-status could flip)
- * but do not trigger a notification, since the discoverable set is almost
- * always identical and Vite HMR already covers in-place content edits.
+ * the fresh list whenever the discoverable *set* changes:
+ *   - `add` / `unlink`: the file's entries appeared/disappeared — always
+ *     publish.
+ *   - `change`: a shim edit can add or remove named exports, which mutates
+ *     the entry set. We re-discover and diff against the previous snapshot;
+ *     identity-preserving edits (e.g. tweaking JSX inside an existing shim)
+ *     don't trigger a publish.
  *
  * Use `close()` to dispose of the watcher when shutting down.
  */
@@ -66,8 +82,15 @@ export async function createComponentRegistry(
   // freshly-invalidated cache.
   let generation = 0;
 
+  // Last published snapshot, used by the `change`-event diff guard so we
+  // don't spam subscribers when a shim edit doesn't change its export set.
+  let lastPublished: ComponentInfo[] | null = null;
+
   const subscribers = new Set<(components: ComponentInfo[]) => void>();
   let publishTimer: ReturnType<typeof setTimeout> | null = null;
+  // When set, the next publish must compare against `lastPublished` and skip
+  // delivery on equality. Set on `change`, cleared on `add` / `unlink`.
+  let pendingPublishIsDiffOnly = false;
 
   async function refresh(): Promise<ComponentInfo[]> {
     const startedAt = generation;
@@ -86,7 +109,13 @@ export async function createComponentRegistry(
     return pending;
   }
 
-  function schedulePublish(): void {
+  function schedulePublish(diffOnly: boolean): void {
+    // If an unconditional publish is already pending, don't downgrade it.
+    if (publishTimer && !diffOnly) {
+      pendingPublishIsDiffOnly = false;
+    } else if (!publishTimer) {
+      pendingPublishIsDiffOnly = diffOnly;
+    }
     if (publishTimer) clearTimeout(publishTimer);
     publishTimer = setTimeout(() => {
       publishTimer = null;
@@ -99,8 +128,7 @@ export async function createComponentRegistry(
   // generation. Without this, the publisher could resolve with a snapshot
   // taken before a chokidar event that fired during its in-flight refresh —
   // the cache side is protected by the generation guard inside refresh(),
-  // but the publisher path also reads the result directly. Test:
-  // `does not deliver superseded data to subscribers` in component-watcher.test.ts.
+  // but the publisher path also reads the result directly.
   async function publishCurrent(): Promise<void> {
     let components: ComponentInfo[];
     let startedAt: number;
@@ -109,6 +137,15 @@ export async function createComponentRegistry(
       components = await getOrStartRefresh();
     } while (startedAt !== generation);
     if (subscribers.size === 0) return;
+    const diffOnly = pendingPublishIsDiffOnly;
+    pendingPublishIsDiffOnly = false;
+    if (diffOnly && lastPublished !== null && componentsEqual(lastPublished, components)) {
+      // Identity-preserving content edit — don't notify subscribers, but
+      // keep `lastPublished` as-is so a subsequent change against the same
+      // baseline still no-ops correctly.
+      return;
+    }
+    lastPublished = components;
     for (const sub of subscribers) sub(components);
   }
 
@@ -130,17 +167,19 @@ export async function createComponentRegistry(
       cache = null;
       generation++;
     };
-    const invalidateAndPublish = (): void => {
+    const invalidateAndPublish = (diffOnly: boolean) => (): void => {
       invalidate();
-      schedulePublish();
+      schedulePublish(diffOnly);
     };
-    // `add` and `unlink` change the discoverable set — notify subscribers.
-    watcher.on("add", invalidateAndPublish);
-    watcher.on("unlink", invalidateAndPublish);
-    // `change` invalidates the cache (a file's barrel-status could flip)
-    // but the discoverable set almost always stays the same; Vite HMR
-    // covers in-place content edits for already-mounted cards.
-    watcher.on("change", invalidate);
+    // `add` / `unlink` change the discoverable set unconditionally — publish.
+    watcher.on("add", invalidateAndPublish(false));
+    watcher.on("unlink", invalidateAndPublish(false));
+    // `change` may add or remove named exports of a shim (or flip a
+    // bare-file's barrel status), which mutates the entry set. Re-discover
+    // and only publish when the result actually differs from the last
+    // snapshot. Vite HMR still covers in-place content edits for already-
+    // mounted cards; this channel is only for sidebar entry changes.
+    watcher.on("change", invalidateAndPublish(true));
   }
 
   return {

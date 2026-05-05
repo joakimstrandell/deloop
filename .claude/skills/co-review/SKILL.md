@@ -38,6 +38,7 @@ When Reviewer returns findings:
 ## Phase 3 — Cycle 2 (cold respawn)
 
 Cold-respawn Implementer with:
+
 - Worktree path (still alive).
 - PR URL.
 - The arbitrated change list (only accepted items).
@@ -45,6 +46,7 @@ Cold-respawn Implementer with:
 - Reminder: this is cycle 2; final pass.
 
 When Implementer reports follow-up commits, cold-respawn Reviewer with:
+
 - Worktree path, PR URL, Linear issue.
 - The cycle-1 arbitrated change list as context.
 - Instruction: re-review focused on the arbitrated items + diff since cycle 1. Flag new issues introduced.
@@ -54,6 +56,7 @@ CPTO arbitrates cycle 2 findings the same way. After cycle 2, all open items are
 ## Phase 4 — Merge step
 
 Verify CI is green on the PR. If red:
+
 - One `gh run rerun` retry.
 - If still red and the failure looks real (not flake), this is a circuit breaker in autonomous mode → ask CEO. In manual mode, surface to CEO at co-review.
 
@@ -63,6 +66,7 @@ Then:
 - **Autonomous mode**: merge with the project's convention (check recent merged PRs if unsure of squash vs rebase). Use `gh pr merge --squash --delete-branch` (or matching convention).
 
 After merge:
+
 1. Sync local main: `git checkout main && git pull --ff-only`.
 2. Delete the local branch: `git branch -d <branch>`.
 3. Remove the worktree: `git worktree remove <path>`.
