@@ -74,6 +74,44 @@ describe("loadDeloopConfig", () => {
     expect(result).toEqual({ styles: "src/styles/app.css" });
   });
 
+  it("accepts an array of strings for styles (multi-source)", async () => {
+    root = makeRoot();
+    mkdirSync(join(root, ".deloop"), { recursive: true });
+    writeFileSync(
+      join(root, ".deloop/config.ts"),
+      `export default { styles: ["design-system.css", "overrides.css"] };\n`,
+      "utf8",
+    );
+
+    const result = await loadDeloopConfig(root);
+
+    expect(result).toEqual({ styles: ["design-system.css", "overrides.css"] });
+  });
+
+  it("filters non-string entries out of a styles array", async () => {
+    root = makeRoot();
+    mkdirSync(join(root, ".deloop"), { recursive: true });
+    writeFileSync(
+      join(root, ".deloop/config.ts"),
+      `export default { styles: ["a.css", 42, null, "b.css"] };\n`,
+      "utf8",
+    );
+
+    const result = await loadDeloopConfig(root);
+
+    expect(result).toEqual({ styles: ["a.css", "b.css"] });
+  });
+
+  it("preserves an empty styles array (warn is the runtime signal)", async () => {
+    root = makeRoot();
+    mkdirSync(join(root, ".deloop"), { recursive: true });
+    writeFileSync(join(root, ".deloop/config.ts"), `export default { styles: [] };\n`, "utf8");
+
+    const result = await loadDeloopConfig(root);
+
+    expect(result).toEqual({ styles: [] });
+  });
+
   it("normalizes the componentsDir field as a single directory path", async () => {
     root = makeRoot();
     mkdirSync(join(root, ".deloop"), { recursive: true });
@@ -88,7 +126,7 @@ describe("loadDeloopConfig", () => {
     expect(result).toEqual({ componentsDir: "src/components" });
   });
 
-  it("drops styles and componentsDir when not strings", async () => {
+  it("drops styles when neither string nor array; drops componentsDir when not a string", async () => {
     root = makeRoot();
     mkdirSync(join(root, ".deloop"), { recursive: true });
     writeFileSync(

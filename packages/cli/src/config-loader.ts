@@ -18,13 +18,18 @@ export interface DeloopConfig {
    */
   components?: string[];
   /**
-   * Single CSS entry for the canvas iframe, relative to the user project
-   * root (e.g. `"src/styles/globals.css"`). Loaded as the user's design
-   * environment so components render with their real tokens, fonts, and
-   * Tailwind utilities. When absent, Deloop probes a small set of known
-   * conventional paths via {@link autoDetectStylesPath}.
+   * CSS entry (or entries) for the canvas iframe, relative to the user
+   * project root (e.g. `"src/styles/globals.css"`). Loaded as the user's
+   * design environment so components render with their real tokens,
+   * fonts, and Tailwind utilities. When absent, Deloop probes a small set
+   * of known conventional paths via {@link autoDetectStylesPath}.
+   *
+   * Accepts either a single string or an array of strings. With an array,
+   * each entry is injected as its own `<link rel="stylesheet">` in array
+   * order — the last entry wins on cascade tie, so layer your design
+   * system first and your overrides last.
    */
-  styles?: string;
+  styles?: string | string[];
   /**
    * Directory of component sources to scan for Tailwind class usage when
    * the user's input CSS does not already declare an `@source` directive.
@@ -130,6 +135,15 @@ function normalizeConfig(raw: Record<string, unknown>): DeloopConfig {
   }
   if (typeof raw["styles"] === "string") {
     result.styles = raw["styles"];
+  } else if (Array.isArray(raw["styles"])) {
+    // Filter out non-string entries — same "validate and drop" pattern
+    // we already use for `components`. An empty result (e.g. `[]` or
+    // `[42, true]`) is preserved as-is and will trigger the no-CSS warn
+    // at server start.
+    const filtered = (raw["styles"] as unknown[]).filter(
+      (entry): entry is string => typeof entry === "string",
+    );
+    result.styles = filtered;
   }
   if (typeof raw["componentsDir"] === "string") {
     result.componentsDir = raw["componentsDir"];
