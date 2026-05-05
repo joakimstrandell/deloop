@@ -9,7 +9,12 @@
  * Type definitions live in `./types.ts`; this file is the only place that
  * touches the wire shape at runtime.
  */
-import type { IframeToShellMessage, PseudoState, ShellToIframeMessage } from "./types.js";
+import type {
+  ColorScheme,
+  IframeToShellMessage,
+  PseudoState,
+  ShellToIframeMessage,
+} from "./types.js";
 
 const PSEUDO_STATES: ReadonlySet<PseudoState> = new Set([
   "default",
@@ -18,6 +23,8 @@ const PSEUDO_STATES: ReadonlySet<PseudoState> = new Set([
   "active",
   "disabled",
 ]);
+
+const COLOR_SCHEMES: ReadonlySet<ColorScheme> = new Set(["light", "dark"]);
 
 function isObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
@@ -68,6 +75,13 @@ export function parseShellToIframeMessage(input: unknown): ShellToIframeMessage 
         PSEUDO_STATES.has(state as PseudoState)
       ) {
         return { type: "setPseudoState", cardId, state: state as PseudoState };
+      }
+      return null;
+    }
+    case "setColorScheme": {
+      const { scheme } = input;
+      if (typeof scheme === "string" && COLOR_SCHEMES.has(scheme as ColorScheme)) {
+        return { type: "setColorScheme", scheme: scheme as ColorScheme };
       }
       return null;
     }
