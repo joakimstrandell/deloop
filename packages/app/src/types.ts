@@ -28,6 +28,16 @@ export interface ComponentInfo {
 export type PseudoState = "default" | "hover" | "focus" | "active" | "disabled";
 
 /**
+ * Resolved color scheme literal as it appears on the wire.
+ *
+ * The shell tracks a richer `Mode = "light" | "dark" | "system"` user
+ * preference and listens to `prefers-color-scheme` in one place; the
+ * iframe only ever receives a resolved literal. This keeps the dark-mode
+ * mechanism single-sourced and avoids duplicate `matchMedia` listeners.
+ */
+export type ColorScheme = "light" | "dark";
+
+/**
  * Messages sent from the shell to the canvas iframe.
  *
  * Each message that targets a specific card carries a `cardId` so the
@@ -66,6 +76,16 @@ export type ShellToIframeMessage =
       type: "setPseudoState";
       cardId: string;
       state: PseudoState;
+    }
+  | {
+      /**
+       * Shell broadcasts the user's resolved color scheme. The shell owns
+       * `Mode` tracking (light / dark / system) and `matchMedia`; the wire
+       * only carries the resolved literal so the iframe never duplicates
+       * the OS listener.
+       */
+      type: "setColorScheme";
+      scheme: ColorScheme;
     };
 
 /** Messages sent from the canvas iframe back to the shell. */

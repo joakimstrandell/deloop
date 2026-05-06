@@ -122,6 +122,26 @@ describe("parseShellToIframeMessage", () => {
       parseShellToIframeMessage({ type: "setPseudoState", cardId: "x", state: "exploding" }),
     ).toBeNull();
   });
+
+  it("accepts setColorScheme with light", () => {
+    const msg = { type: "setColorScheme", scheme: "light" } as const;
+    expect(parseShellToIframeMessage(msg)).toEqual(msg);
+  });
+
+  it("accepts setColorScheme with dark", () => {
+    const msg = { type: "setColorScheme", scheme: "dark" } as const;
+    expect(parseShellToIframeMessage(msg)).toEqual(msg);
+  });
+
+  it("rejects setColorScheme with an unsupported scheme literal", () => {
+    // The wire only ever carries resolved schemes — never `"system"`.
+    // The shell resolves `system` against `prefers-color-scheme` before
+    // posting, so the iframe's parser must reject it as malformed.
+    expect(parseShellToIframeMessage({ type: "setColorScheme", scheme: "system" })).toBeNull();
+    expect(parseShellToIframeMessage({ type: "setColorScheme", scheme: "" })).toBeNull();
+    expect(parseShellToIframeMessage({ type: "setColorScheme", scheme: 42 })).toBeNull();
+    expect(parseShellToIframeMessage({ type: "setColorScheme" })).toBeNull();
+  });
 });
 
 describe("parseIframeToShellMessage", () => {
