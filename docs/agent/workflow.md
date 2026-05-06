@@ -51,11 +51,24 @@ Trivial unblocking infra fixes (CI config, dependency-pin updates, docs-only edi
 ## PRDs
 
 - Multi-PRD repo: `docs/prd/`.
-- `docs/prd/foundation.md`: v0 application vision; evolves but doesn't get superseded.
-- `docs/prd/<slug>.md`: per vertical-slice / feature initiative (descriptive slug, no version suffix).
-- `docs/prd/README.md`: light index of active PRDs and their status.
-- Write a PRD when initiative spans more than ~3 issues, introduces a user-facing concept, or has cross-cutting architectural impact. Below that threshold, Linear issue description suffices.
-- Each issue references its parent PRD path in the issue description (e.g. `PRD: docs/prd/<slug>.md`).
+- `docs/prd/foundation.md`: vision, positioning, mode taxonomy, language. Evolves but doesn't get superseded.
+- `docs/prd/mN-<slug>.md`: milestone-aligned PRDs. One focus per milestone, mapped 1:1 to a Linear milestone. Numbered in the planned execution order.
+- `docs/prd/<slug>.md` (no prefix): unscheduled initiatives.
+- `docs/prd/README.md`: index of active PRDs and their status.
+- Write a PRD when an initiative spans more than ~3 issues, introduces a user-facing concept, or has cross-cutting architectural impact. Below that threshold, the Linear issue description suffices.
+- Each issue references its parent PRD path in the issue description (e.g. `PRD: docs/prd/m2-screens.md`).
+
+### PRD ↔ Linear milestone lifecycle
+
+The milestone PRD and the Linear milestone are the same scope from two angles. They stay in sync across five lifecycle steps:
+
+1. **Grill** — sharpen the PRD (Problem, Scope, Decisions). Use `/grill-with-docs` to challenge it against `foundation.md`, `CONTEXT.md`, and existing ADRs. Decisions that pass the ADR bar (hard to reverse, cross-boundary, surprising-without-context) get an ADR; the PRD references it by name only.
+2. **Milestone-assign** — when scope is firm, the `mN-` prefix locks the PRD to Linear milestone N. Both must exist; the PRD's header references the Linear milestone, the Linear milestone references the PRD path.
+3. **Decompose** — break the PRD's Scope into Linear issues (use `/to-issues`). Each issue's description includes `PRD: docs/prd/mN-<slug>.md`. Issues are the workable units; the PRD's Scope sections are the durable shape.
+4. **Mutate during ideation or kickoff** — scope is not frozen at grill time. Issues may be added, split, retitled, or rescoped during ideation, `/kickoff` grilling, or implementation. New issues belong to the milestone; redefined issues stay in the milestone unless they no longer fit.
+5. **Sync back to PRD** — when issues are added, removed, or substantially redefined, the PRD's Scope or Out-of-scope sections are updated in the same change. The invariant is at milestone-level grain: the PRD describes *what the milestone delivers*, not every issue ID. Issue splits and AC tweaks inside an existing scope bullet do not require a PRD edit; new scope bullets and dropped scope do.
+
+When the PRD and Linear disagree, neither wins automatically — the disagreement is a smell. CPTO reconciles by editing whichever is wrong.
 
 ## Plans Policy
 

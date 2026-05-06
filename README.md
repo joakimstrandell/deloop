@@ -86,12 +86,12 @@ export function Tooltip() {
 }
 ```
 
-## Current limitations (P0)
+## Current limitations
 
 - Currently tested and supported with React 19.x projects
 - Component discovery is shim-only (`*.deloop.tsx`); bare `.tsx` files do not appear in the sidebar
 - CLI distribution is not published yet (local/dev usage from this repo)
-- Token editing, theme management, and advanced canvas capabilities are not in scope yet
+- Only the spatial canvas (Pages mode) is shipped today. Component Preview, Screens, and live token editing are on the roadmap — see `docs/prd/` for milestone PRDs.
 
 ## Compatibility
 

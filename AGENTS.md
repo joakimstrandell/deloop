@@ -2,7 +2,7 @@
 
 Design system workbench: a spatial canvas for rendering real React components with live token editing.
 
-PRDs live in `docs/prd/`. Foundation PRD: `docs/prd/foundation.md` (v0 application vision). Vertical-slice PRDs per initiative: `docs/prd/<slug>.md`. Index: `docs/prd/README.md`.
+PRDs live in `docs/prd/`. Vision: `docs/prd/foundation.md`. Milestone PRDs: `docs/prd/mN-<slug>.md` (one focus per milestone, mapped 1:1 to a Linear milestone). Unscheduled initiatives: `docs/prd/<slug>.md` (no `mN-` prefix). Index: `docs/prd/README.md`.
 
 ## Roles
 
@@ -72,7 +72,7 @@ When CPO and CTO judgment conflict, surface it explicitly ("as CPO I'd ship X; a
 - `README.md` — project intro for humans
 - `CONTEXT.md` — domain language and glossary (canonical)
 - this file (`AGENTS.md`) — agent rules, roles, orchestration
-- `docs/prd/` — product vision and feature PRDs
+- `docs/prd/` — `foundation.md` (vision), `mN-*.md` (milestone PRDs), and unprefixed PRDs for unscheduled initiatives. Index in `docs/prd/README.md`.
 - `docs/agent/workflow.md` — workflow and Linear usage
 - `docs/agent/testing.md` — testing strategy and required checks
 - `docs/agent/code-review.md` — PR review process
