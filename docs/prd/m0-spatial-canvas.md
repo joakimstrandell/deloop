@@ -3,7 +3,7 @@
 Status: Active (in flight)
 Created: 2026-04-28
 Updated: 2026-05-06
-Linear: M0 Spatial Canvas
+Linear: [M0 Spatial Canvas](https://linear.app/awkwardgroup/project/deloop-72b870c3a511?selectedMilestone=217bd8d0-dfd0-486f-972d-9937fdb9d15a)
 
 ## Problem
 
