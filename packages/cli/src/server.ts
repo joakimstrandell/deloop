@@ -4,6 +4,7 @@ import express, { type Response } from "express";
 import {
   createViteComponentServer,
   resolveUserPath,
+  type CanvasResolveConfig,
   type CanvasStyleConfig,
 } from "./vite-component-server.js";
 import { createComponentRegistry } from "./component-watcher.js";
@@ -47,7 +48,16 @@ export async function startServer({ root, port, open }: ServerOptions): Promise<
     warnNoCssResolved();
   }
 
-  const vite = await createViteComponentServer(root, style);
+  const resolveConfig: CanvasResolveConfig = {
+    userAliases: config.resolve?.alias ?? {},
+  };
+
+  // Pass `httpServer` to Vite so its HMR WebSocket attaches to our
+  // existing HTTP server instead of opening a fresh socket on the
+  // default port 24678. Two CLI instances on different ports can then
+  // coexist (e.g. parallel Playwright webServers). Without this, the
+  // second instance fails to bind 24678 and clients reconnect-loop.
+  const vite = await createViteComponentServer(root, style, resolveConfig, { httpServer });
 
   // REST API — first paint of the sidebar reads this once. Subsequent
   // updates flow through the SSE channel below.

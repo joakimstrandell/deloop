@@ -1,0 +1,6 @@
+{
+  "name": "@deloop-fixture/tsconfig-app-split",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module"
+}

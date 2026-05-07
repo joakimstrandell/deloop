@@ -1,6 +1,9 @@
 import { createServer, type Plugin, type ViteDevServer } from "vite";
+import tsconfigPaths from "vite-tsconfig-paths";
+import { parse as parseTsconfig } from "tsconfck";
 import { existsSync, readFileSync } from "node:fs";
-import { dirname, isAbsolute, join, normalize } from "node:path";
+import type { Server as HttpServer } from "node:http";
+import { dirname, isAbsolute, join, normalize, resolve as resolvePath } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -18,6 +21,25 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 export interface CanvasStyleConfig {
   cssPaths: string[];
   componentsDir: string | null;
+}
+
+/**
+ * Module-resolution config for the canvas Vite middleware (AWK-75).
+ *
+ * `userAliases` is the explicit `Record<aliasKey, target>` from
+ * `.deloop/config.ts#resolve.alias`, with targets already resolved to
+ * absolute paths. Registered as a Vite alias plugin BEFORE
+ * `vite-tsconfig-paths`, so explicit overrides win on key collision.
+ *
+ * The tsconfig-derived aliases are auto-detected at server-construction
+ * time by passing `tsconfig.json` and `tsconfig.app.json` (when they
+ * exist) to `vite-tsconfig-paths` as explicit `projects`. Explicit
+ * `projects` is REQUIRED because Vite's `root` is `packages/app` (Deloop's
+ * own canvas shell), not the user project root — without it the plugin
+ * silently resolves user aliases against Deloop's tsconfig.
+ */
+export interface CanvasResolveConfig {
+  userAliases: Record<string, string>;
 }
 
 /**
@@ -44,12 +66,87 @@ export interface CanvasStyleConfig {
  * the CLI is published to npm, this path must be updated to reference
  * bundled app assets. See ADR-0002 for context.
  */
+/**
+ * Optional integration hooks for {@link createViteComponentServer}.
+ *
+ * `httpServer` lets the caller hand Vite a pre-existing Node HTTP server
+ * to which it should attach the HMR WebSocket upgrade. When omitted,
+ * Vite spawns its own WebSocket server on port 24678. Sharing a server
+ * is required when running multiple CLI instances side-by-side (e.g.
+ * parallel Playwright webServers) — otherwise the second instance
+ * collides on 24678 and HMR clients reconnect-loop endlessly.
+ */
+export interface CanvasServerHooks {
+  httpServer?: HttpServer;
+}
+
 export async function createViteComponentServer(
   projectRoot: string,
   style: CanvasStyleConfig = { cssPaths: [], componentsDir: null },
+  resolveConfig: CanvasResolveConfig = { userAliases: {} },
+  hooks: CanvasServerHooks = {},
 ): Promise<ViteDevServer> {
   // In the workspace: packages/cli/src/ → ../../app = packages/app/
   const appRoot = join(__dirname, "../../app");
+
+  // AWK-75: discover the user's tsconfig path-alias declarations so we can
+  // serve `@/foo` style imports through Vite's middleware. Explicit
+  // `projects` is required because Vite's `root` is `appRoot`, not the
+  // user project root — without it the plugin would silently resolve
+  // aliases against Deloop's own tsconfig. See vite-tsconfig-paths docs.
+  const candidateTsconfigs = [
+    join(projectRoot, "tsconfig.json"),
+    join(projectRoot, "tsconfig.app.json"),
+  ].filter((p) => existsSync(p));
+
+  // Eagerly resolve every active alias target so we can pre-expand
+  // `server.fs.allow`. Vite's `/@fs/` middleware checks the allow list
+  // at request time; if the user's alias points outside `projectRoot`
+  // (common in monorepos), we must whitelist that directory now or
+  // requests will 403. Errors here are non-fatal: a malformed tsconfig
+  // must NOT crash the dev server.
+  const tsconfigAliasTargets = await collectTsconfigAliasTargets(candidateTsconfigs);
+  const userAliasTargets = Object.values(resolveConfig.userAliases).map((target) =>
+    resolveAliasTarget(projectRoot, target),
+  );
+  const fsAllow = uniquePaths([appRoot, projectRoot, ...tsconfigAliasTargets, ...userAliasTargets]);
+
+  // User-supplied aliases first (highest precedence) — Vite resolves
+  // plugins in registration order, so an entry registered earlier wins on
+  // key collision against `vite-tsconfig-paths`.
+  const userAliasPlugin = createUserAliasPlugin(projectRoot, resolveConfig.userAliases);
+
+  // Wrap plugin registration in try/catch as belt-and-suspenders: the
+  // plugin's `loose: true` flag covers most parse-tolerance, but any
+  // unexpected throw during construction must NOT crash the dev server.
+  //
+  // Why `vite-tsconfig-paths` instead of Vite 8's native
+  // `resolve.tsconfigPaths: true`? The native option does not accept an
+  // explicit `projects: [...]` argument and resolves against Vite's
+  // `root` (here `appRoot`, i.e. `packages/app` — Deloop's canvas shell,
+  // not the user project). It would silently resolve user `@/foo`
+  // imports against Deloop's own tsconfig. Until the native option grows
+  // an explicit-projects knob, we keep the (deprecated) plugin so we can
+  // pass `projects: candidateTsconfigs` and target the user project.
+  let tsconfigPathsPlugin: Plugin | Plugin[] | null = null;
+  if (candidateTsconfigs.length > 0) {
+    try {
+      tsconfigPathsPlugin = tsconfigPaths({
+        projects: candidateTsconfigs,
+        loose: true,
+        // Defer parse-error reporting to our own one-line warning emitted
+        // from `collectTsconfigAliasTargets`; the plugin's stack trace is
+        // noisy and duplicates info the user already has.
+        ignoreConfigErrors: true,
+      }) as Plugin | Plugin[];
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      process.stderr.write(
+        `[deloop] failed to register tsconfig path-alias resolver: ${message}\n`,
+      );
+      tsconfigPathsPlugin = null;
+    }
+  }
 
   const server = await createServer({
     // Explicitly load packages/app's vite.config.ts so the Tailwind v4 plugin
@@ -57,12 +154,20 @@ export async function createViteComponentServer(
     // from process.cwd() (the user's project) and finds nothing.
     configFile: join(appRoot, "vite.config.ts"),
     root: appRoot,
-    plugins: [canvasStyleEnvironmentPlugin(style)],
+    plugins: [
+      ...(userAliasPlugin ? [userAliasPlugin] : []),
+      ...(tsconfigPathsPlugin ? [tsconfigPathsPlugin].flat() : []),
+      canvasStyleEnvironmentPlugin(style),
+    ],
     server: {
       middlewareMode: true,
       fs: {
-        allow: [appRoot, projectRoot],
+        allow: fsAllow,
       },
+      // When the caller supplies an HTTP server, attach HMR's WebSocket
+      // upgrade to it instead of spawning a separate WS server on port
+      // 24678. Required for parallel CLI instances; harmless otherwise.
+      ...(hooks.httpServer ? { hmr: { server: hooks.httpServer } } : {}),
     },
     resolve: {
       dedupe: ["react", "react-dom", "react/jsx-runtime"],
@@ -73,6 +178,123 @@ export async function createViteComponentServer(
   });
 
   return server;
+}
+
+/**
+ * Reads the list of candidate user tsconfig files and returns the set of
+ * absolute directory targets that any `compilerOptions.paths` mapping
+ * resolves to. The result is used to expand `server.fs.allow` so Vite's
+ * `/@fs/` middleware does not 403 on monorepo-sibling aliases.
+ *
+ * `tsconfck.parse` follows `extends` chains (relative + package-style
+ * like `@tsconfig/recommended`) and merges `compilerOptions.paths` from
+ * the entire chain — that's what makes step (3) of the AC true without
+ * any special-casing on our side.
+ *
+ * Defensive posture: any failure (missing file, parse error, malformed
+ * `paths` shape) collapses to "no aliases from this tsconfig" with a
+ * single stderr warning. We never throw.
+ */
+export async function collectTsconfigAliasTargets(
+  tsconfigPaths: readonly string[],
+): Promise<string[]> {
+  const targets: string[] = [];
+  for (const tsconfigPath of tsconfigPaths) {
+    try {
+      const result = await parseTsconfig(tsconfigPath);
+      const merged = result.tsconfig as
+        | { compilerOptions?: { baseUrl?: string; paths?: Record<string, unknown> } }
+        | undefined;
+      const compilerOptions = merged?.compilerOptions;
+      if (compilerOptions?.paths == null) continue;
+
+      // `baseUrl` defaults to the directory of the tsconfig that DEFINED
+      // the `paths` (TypeScript's resolution rule). When `extends` is
+      // involved, tsconfck merges `paths` and resolves `baseUrl` against
+      // the file that introduced it; we mirror that by preferring the
+      // merged baseUrl if present and falling back to the tsconfig's own
+      // directory.
+      const baseDir =
+        typeof compilerOptions.baseUrl === "string"
+          ? resolvePath(dirname(tsconfigPath), compilerOptions.baseUrl)
+          : dirname(tsconfigPath);
+
+      for (const candidates of Object.values(compilerOptions.paths)) {
+        if (!Array.isArray(candidates)) continue;
+        for (const candidate of candidates) {
+          if (typeof candidate !== "string") continue;
+          // Strip trailing wildcard segments (`./src/*` → `./src`).
+          const stripped = candidate.replace(/\/?\*+$/, "").replace(/\/+$/, "");
+          if (stripped === "") continue;
+          const absolute = resolvePath(baseDir, stripped);
+          targets.push(absolute);
+        }
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      process.stderr.write(`[deloop] failed to read ${tsconfigPath}: ${message}\n`);
+    }
+  }
+  return targets;
+}
+
+/**
+ * Builds a Vite plugin that registers user-supplied aliases (from
+ * `.deloop/config.ts#resolve.alias`) ahead of `vite-tsconfig-paths`,
+ * giving them precedence on key collision.
+ *
+ * Returns `null` when there are no aliases to register, so the caller
+ * can omit the plugin entirely.
+ */
+export function createUserAliasPlugin(
+  projectRoot: string,
+  aliases: Record<string, string>,
+): Plugin | null {
+  const entries = Object.entries(aliases);
+  if (entries.length === 0) return null;
+
+  const resolved: { find: string; replacement: string }[] = entries.map(([find, target]) => ({
+    find,
+    replacement: resolveAliasTarget(projectRoot, target),
+  }));
+
+  return {
+    name: "deloop:user-aliases",
+    enforce: "pre",
+    config() {
+      return {
+        resolve: {
+          alias: resolved,
+        },
+      };
+    },
+  };
+}
+
+/**
+ * Resolves a user-configured alias target to an absolute path. Already-
+ * absolute paths are returned normalized; relative paths are resolved
+ * against `projectRoot`.
+ */
+function resolveAliasTarget(projectRoot: string, target: string): string {
+  return isAbsolute(target) ? normalize(target) : resolvePath(projectRoot, target);
+}
+
+/**
+ * Deduplicates a list of paths, preserving first-seen order. Uses
+ * normalized form for comparison so trailing-slash drift between
+ * sources doesn't produce duplicate entries.
+ */
+function uniquePaths(paths: readonly string[]): string[] {
+  const seen = new Set<string>();
+  const result: string[] = [];
+  for (const p of paths) {
+    const normalized = normalize(p);
+    if (seen.has(normalized)) continue;
+    seen.add(normalized);
+    result.push(normalized);
+  }
+  return result;
 }
 
 /**

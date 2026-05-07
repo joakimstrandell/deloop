@@ -39,6 +39,35 @@ export interface DeloopConfig {
    * `@source`.
    */
   componentsDir?: string;
+  /**
+   * Module-resolution overrides for the canvas Vite middleware (AWK-75).
+   *
+   * `alias` is a `Record<aliasKey, target>` map applied as a Vite alias
+   * with the highest precedence — it wins on key collision against
+   * aliases auto-derived from the user project's `tsconfig.json#paths` /
+   * `tsconfig.app.json#paths`. Targets may be absolute paths or relative
+   * to the user project root.
+   *
+   * This is the documented escape hatch for projects whose path aliases
+   * are NOT declared in tsconfig (e.g. defined only in `vite.config.ts`).
+   * Per ADR-0002 we never load the user's `vite.config.ts`, so explicit
+   * aliases here are the only way to bridge that gap.
+   *
+   * @example
+   * ```ts
+   * export default {
+   *   resolve: {
+   *     alias: {
+   *       "@": "./src",
+   *       "@ui": "./packages/ui/src",
+   *     },
+   *   },
+   * };
+   * ```
+   */
+  resolve?: {
+    alias?: Record<string, string>;
+  };
 }
 
 /**
@@ -153,6 +182,21 @@ function normalizeConfig(raw: Record<string, unknown>): DeloopConfig {
   }
   if (typeof raw["componentsDir"] === "string") {
     result.componentsDir = raw["componentsDir"];
+  }
+  if (raw["resolve"] != null && typeof raw["resolve"] === "object") {
+    const rawResolve = raw["resolve"] as Record<string, unknown>;
+    if (rawResolve["alias"] != null && typeof rawResolve["alias"] === "object") {
+      const rawAlias = rawResolve["alias"] as Record<string, unknown>;
+      const alias: Record<string, string> = {};
+      for (const [key, value] of Object.entries(rawAlias)) {
+        if (typeof key === "string" && key !== "" && typeof value === "string" && value !== "") {
+          alias[key] = value;
+        }
+      }
+      if (Object.keys(alias).length > 0) {
+        result.resolve = { alias };
+      }
+    }
   }
   return result;
 }
