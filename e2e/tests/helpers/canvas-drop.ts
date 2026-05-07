@@ -13,13 +13,76 @@
  * event on the iframe document with a constructed `DataTransfer`
  * carrying the same MIME payload.
  */
-import type { Page } from "@playwright/test";
+import type { Frame, Page } from "@playwright/test";
 import { COMPONENT_DRAG_MIME } from "../../../packages/app/src/component-drag.js";
 
 interface ComponentInfo {
   name: string;
   path: string;
   relativePath: string;
+}
+
+/**
+ * Polls until `page.frame({url: /iframe\.html/})` returns a non-null
+ * Frame. Used after operations that may trigger a Vite full-reload
+ * (e.g. cold-Vite dep optimization), where the iframe is briefly torn
+ * down before the new document loads.
+ */
+async function waitForCanvasFrame(page: Page, deadlineMs: number): Promise<Frame> {
+  while (Date.now() < deadlineMs) {
+    const frame = page.frame({ url: /iframe\.html/ });
+    if (frame && !frame.isDetached()) return frame;
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+  throw new Error("Canvas iframe not present before deadline");
+}
+
+/**
+ * Resolves to a canvas iframe Frame whose document-level drop listener
+ * is installed and recognizes Deloop's component-drag MIME. Survives a
+ * Vite full-reload mid-probe by detecting the resulting "frame detached"
+ * error, polling for the new iframe, and retrying the probe.
+ *
+ * The dragover-defaultPrevented probe is the load-bearing readiness
+ * signal — see comments at the call site.
+ */
+async function waitForReadyCanvasFrame(page: Page, timeoutMs: number): Promise<Frame> {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const frame = await waitForCanvasFrame(page, deadline);
+    try {
+      await frame.waitForFunction(
+        (mime) => {
+          const probe = new Event("dragover", { bubbles: true, cancelable: true });
+          const dt = new DataTransfer();
+          dt.setData(mime, "{}");
+          Object.defineProperty(probe, "dataTransfer", { value: dt });
+          Object.defineProperty(probe, "clientX", { value: 0 });
+          Object.defineProperty(probe, "clientY", { value: 0 });
+          document.dispatchEvent(probe);
+          return probe.defaultPrevented === true;
+        },
+        COMPONENT_DRAG_MIME,
+        { timeout: Math.max(deadline - Date.now(), 100) },
+      );
+      // Probe succeeded on a still-attached frame — caller can dispatch
+      // the synthetic drop against this Frame safely.
+      if (!frame.isDetached()) return frame;
+      // Frame got detached between probe success and return — loop and
+      // re-acquire the post-reload iframe.
+    } catch (err) {
+      // Re-throw any error that isn't a frame-detached symptom; those
+      // mean the iframe really is gone (test-author error, page closed,
+      // etc.) and a longer wait wouldn't help.
+      const message = err instanceof Error ? err.message : String(err);
+      if (!/frame was detached|execution context was destroyed/i.test(message)) {
+        throw err;
+      }
+      // Frame got detached mid-probe — that's a Vite reload firing
+      // exactly as we want. Loop and re-acquire the post-reload frame.
+    }
+  }
+  throw new Error("Canvas iframe drop listener not ready before deadline");
 }
 
 /**
@@ -62,22 +125,73 @@ export async function dropComponentOnCanvas(
 ): Promise<void> {
   const component = await fetchComponentInfo(page, componentName);
 
-  // Reach the iframe via Playwright's frame() API (not frameLocator,
-  // which doesn't expose .evaluate). Match the canvas iframe by URL.
-  const frame = page.frame({ url: /iframe\.html/ });
-  if (!frame) {
+  // Prewarm Vite for this component's module graph (AWK-90).
+  //
+  // Failure mode being prevented: under `CI=1`, `playwright.config.ts`
+  // sets `reuseExistingServer: false`, so each `pnpm test:e2e`
+  // invocation boots a fresh Vite. The first iframe `import()` of a
+  // user component (the one triggered by the shell's `mount` after a
+  // synthetic drop) makes Vite discover new bare-import deps
+  // (e.g. `class-variance-authority`, `radix-ui`, `clsx`,
+  // `tailwind-merge`) and rebuild the depOptimize bundle. After the
+  // rebuild Vite issues a full page reload to swap the iframe over to
+  // the freshly-bundled deps. That reload tears down the iframe's
+  // `mounted` Map state, so the dropped card disappears mid-test —
+  // observed as `toBeVisible` timeout for the rendered Button on the
+  // first attempt, recovering on retry once Vite is warm.
+  //
+  // Fix shape: trigger an ESM evaluation of the user component module
+  // BEFORE we synthesize the drop, then await the post-warmup readiness
+  // probe below. If the prewarm import causes Vite to reload, the
+  // reload happens here — not after the drop. By the time the probe
+  // returns true, the iframe's drop-listener `useEffect` has run on a
+  // hot Vite, and the synthetic drop's downstream `mount` import hits a
+  // cache hit (~30-50ms locally vs. 300ms+ on cold transform).
+  //
+  // We catch errors from the prewarm `import()` call: if Vite reloads
+  // mid-import, the in-flight module evaluation is aborted with an
+  // error. That's expected — the readiness probe below is the
+  // load-bearing post-condition, not the prewarm import's resolution.
+  //
+  // Side-effect note: this evaluates the user component module's top
+  // level. Current `@deloop/ui` shims (button.deloop.tsx, tooltip.deloop.tsx)
+  // are pure imports + a function declaration with no top-level effects
+  // (no telemetry, no registration, no console writes). A future user
+  // component with top-level effects would fire those twice — once on
+  // warmup, once on real mount. That is a known constraint of this
+  // helper, not a defect; if it ever bites, move the prewarm into a
+  // Playwright fixture that uses a side-effect-free probe component.
+  const componentImportPath = `/@fs${component.path}`;
+  const frameForWarmup = page.frame({ url: /iframe\.html/ });
+  if (!frameForWarmup) {
     throw new Error("Canvas iframe not loaded — did you call page.goto first?");
   }
+  await frameForWarmup
+    .evaluate((path) => {
+      // `/* @vite-ignore */` matches the iframe's own dynamic-import
+      // call site, so Vite treats this exactly the same way at module-
+      // graph level.
+      return import(/* @vite-ignore */ path).then(
+        () => undefined,
+        () => undefined,
+      );
+    }, componentImportPath)
+    .catch(() => {
+      // If Vite tears down the iframe context to reload, this
+      // `frame.evaluate` itself can reject with an "execution context
+      // destroyed" error. That's the success case — the reload is what
+      // we want to happen here, not after the drop.
+    });
 
-  // Wait for the iframe's React tree to hydrate AND the document-level
-  // drag/drop listeners to be attached before dispatching the synthetic
-  // drop. Without this wait, callers running immediately after sidebar
-  // setup can race the iframe: the synthetic drop fires before
-  // `IframeApp`'s drop-listener `useEffect` has run, and the event is
-  // silently lost — manifests as flake under parallel workers.
+  // Re-acquire the frame and run the drop-listener readiness probe.
+  // Wrapped in a retry loop because a Vite full-reload triggered by
+  // the prewarm above can detach the frame mid-probe (the old document
+  // is being torn down). On detach we poll for the new iframe and
+  // retry; once the post-reload iframe's drop listener is installed
+  // the probe succeeds and we exit.
   //
-  // Readiness signal chosen: dispatch a probe `dragover` carrying our
-  // MIME and check `event.defaultPrevented`. The iframe's handler calls
+  // Readiness signal: dispatch a probe `dragover` carrying our MIME
+  // and check `event.defaultPrevented`. The iframe's handler calls
   // `preventDefault()` only when it matches `COMPONENT_DRAG_MIME`, so
   // `defaultPrevented === true` is positive proof the document-level
   // listener is installed and recognizes our payload — strictly
@@ -89,20 +203,7 @@ export async function dropComponentOnCanvas(
   // effect of `preventDefault`-ing the spec-required precursor), but the
   // real dropComponentOnCanvas dispatches its own dragover anyway, so
   // the state is the same as it would be on a real drag.
-  await frame.waitForFunction(
-    (mime) => {
-      const probe = new Event("dragover", { bubbles: true, cancelable: true });
-      const dt = new DataTransfer();
-      dt.setData(mime, "{}");
-      Object.defineProperty(probe, "dataTransfer", { value: dt });
-      Object.defineProperty(probe, "clientX", { value: 0 });
-      Object.defineProperty(probe, "clientY", { value: 0 });
-      document.dispatchEvent(probe);
-      return probe.defaultPrevented === true;
-    },
-    COMPONENT_DRAG_MIME,
-    { timeout: 10_000 },
-  );
+  const frame = await waitForReadyCanvasFrame(page, 10_000);
 
   await frame.evaluate(
     ({ component, mime, x, y }) => {
