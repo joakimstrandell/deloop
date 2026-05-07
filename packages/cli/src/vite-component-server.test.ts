@@ -444,6 +444,52 @@ describe("AWK-75 tsconfig path-alias propagation", () => {
       expect(targets).toContain(expected);
     });
 
+    it("follows package-style extends (e.g. @tsconfig/<pkg>) via node_modules", async () => {
+      // AWK-75 AC step (3) explicitly calls out package-style extends —
+      // `"extends": "@tsconfig/<pkg>/tsconfig.json"` — alongside relative
+      // extends. tsconfck performs the lookup through `node_modules`, so
+      // we stage a real package file on disk and assert that paths declared
+      // in the base surface through the leaf.
+      const root = makeProjectRoot();
+      // Stage `node_modules/@tsconfig/test-base/tsconfig.json` — the literal
+      // package name is irrelevant; what matters is that resolution walks
+      // `node_modules/<scope>/<pkg>/tsconfig.json`.
+      const pkgDir = join(root, "node_modules", "@tsconfig", "test-base");
+      mkdirSync(pkgDir, { recursive: true });
+      mkdirSync(join(pkgDir, "src"), { recursive: true });
+      writeFile(
+        join(pkgDir, "package.json"),
+        JSON.stringify({ name: "@tsconfig/test-base", version: "0.0.0" }),
+      );
+      writeFile(
+        join(pkgDir, "tsconfig.json"),
+        JSON.stringify({
+          compilerOptions: {
+            baseUrl: ".",
+            paths: { "@/*": ["./src/*"] },
+          },
+        }),
+      );
+      writeFile(
+        join(root, "tsconfig.json"),
+        JSON.stringify({
+          extends: "@tsconfig/test-base/tsconfig.json",
+          compilerOptions: {},
+        }),
+      );
+
+      const targets = await collectTsconfigAliasTargets([join(root, "tsconfig.json")]);
+
+      // The base tsconfig lives inside the package directory, so
+      // `baseUrl: "."` resolves against the package — `./src/*` then
+      // points at `node_modules/@tsconfig/test-base/src`. We canonicalize
+      // through realpathSync for the same `/private/var` vs `/var` reason
+      // as the relative-extends test above (Node's module resolver may
+      // also realpath the package, so the path may live under `/private`).
+      const expected = normalize(join(realpathSync(pkgDir), "src"));
+      expect(targets).toContain(expected);
+    });
+
     it("returns an empty list for a tsconfig with no paths field", async () => {
       const root = makeProjectRoot();
       writeFile(join(root, "tsconfig.json"), JSON.stringify({ compilerOptions: { baseUrl: "." } }));
@@ -461,7 +507,15 @@ describe("AWK-75 tsconfig path-alias propagation", () => {
       try {
         const targets = await collectTsconfigAliasTargets([join(root, "tsconfig.json")]);
         expect(targets).toEqual([]);
-        expect(stderr).toHaveBeenCalled();
+        // Filter to our own warnings — Vite / tsconfck may write unrelated
+        // chunks to stderr during the parse, so a bare `toHaveBeenCalled`
+        // doesn't prove "exactly one warning per parse failure". The
+        // contract we care about is: one `[deloop] failed to read …`
+        // warning per malformed tsconfig.
+        const deloopWarnings = stderr.mock.calls.filter(
+          ([msg]) => typeof msg === "string" && msg.includes("[deloop] failed to read"),
+        );
+        expect(deloopWarnings).toHaveLength(1);
       } finally {
         stderr.mockRestore();
       }

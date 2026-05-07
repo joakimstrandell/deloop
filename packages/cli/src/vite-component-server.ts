@@ -119,6 +119,15 @@ export async function createViteComponentServer(
   // Wrap plugin registration in try/catch as belt-and-suspenders: the
   // plugin's `loose: true` flag covers most parse-tolerance, but any
   // unexpected throw during construction must NOT crash the dev server.
+  //
+  // Why `vite-tsconfig-paths` instead of Vite 8's native
+  // `resolve.tsconfigPaths: true`? The native option does not accept an
+  // explicit `projects: [...]` argument and resolves against Vite's
+  // `root` (here `appRoot`, i.e. `packages/app` — Deloop's canvas shell,
+  // not the user project). It would silently resolve user `@/foo`
+  // imports against Deloop's own tsconfig. Until the native option grows
+  // an explicit-projects knob, we keep the (deprecated) plugin so we can
+  // pass `projects: candidateTsconfigs` and target the user project.
   let tsconfigPathsPlugin: Plugin | Plugin[] | null = null;
   if (candidateTsconfigs.length > 0) {
     try {
