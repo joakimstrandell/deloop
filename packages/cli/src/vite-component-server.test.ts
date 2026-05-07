@@ -610,9 +610,20 @@ describe("AWK-75 tsconfig path-alias propagation", () => {
       }
     });
 
-    it("registers the user-alias plugin BEFORE vite-tsconfig-paths so explicit aliases win on key collision", async () => {
+    it("resolves an alias key collision in favour of the explicit user alias (functional resolveId)", async () => {
+      // AWK-83: structurally asserting plugin registration order would still
+      // pass if Vite changed how it merges aliases between `enforce: 'pre'`
+      // plugins. This test exercises the actual resolver: configure both a
+      // tsconfig alias (`@/* → ./src/*`) and an explicit user alias
+      // (`@ → ./override-src`) for the same key, then ask Vite to resolve
+      // `@/foo` and assert the explicit target wins.
       const projectRoot = makeProjectRoot();
       mkdirSync(join(projectRoot, "src"), { recursive: true });
+      mkdirSync(join(projectRoot, "override-src"), { recursive: true });
+      // Real files at BOTH alias targets — without them the resolver would
+      // return `null` and the test would fail for the wrong reason.
+      writeFile(join(projectRoot, "src", "foo.ts"), "export const foo = 'tsconfig';\n");
+      writeFile(join(projectRoot, "override-src", "foo.ts"), "export const foo = 'override';\n");
       writeFile(
         join(projectRoot, "tsconfig.json"),
         JSON.stringify({
@@ -629,16 +640,28 @@ describe("AWK-75 tsconfig path-alias propagation", () => {
         { userAliases: { "@": "./override-src" } },
       );
       try {
-        const plugins = server.config.plugins as { name: string }[];
-        const userIdx = plugins.findIndex((p) => p?.name === "deloop:user-aliases");
-        const tsconfigIdx = plugins.findIndex((p) => p?.name === "vite-tsconfig-paths");
-        expect(userIdx).toBeGreaterThanOrEqual(0);
-        expect(tsconfigIdx).toBeGreaterThanOrEqual(0);
-        // Plugins running with `enforce: 'pre'` run before non-`pre`
-        // plugins, but we also rely on registration order between two
-        // `pre`-stage plugins. Asserting the array order here protects
-        // against regressions where the user plugin loses its slot.
-        expect(userIdx).toBeLessThan(tsconfigIdx);
+        // Vite 8: `server.pluginContainer` is deprecated; the
+        // environment-scoped API is the supported surface.
+        const importer = join(projectRoot, "index.ts");
+        const resolved = await server.environments.client.pluginContainer.resolveId(
+          "@/foo",
+          importer,
+        );
+        // `resolveId` returns `null`, a string, or `{ id, ... }`. Normalize
+        // for a stable cross-platform comparison.
+        const resolvedId =
+          resolved == null ? null : typeof resolved === "string" ? resolved : resolved.id;
+        expect(resolvedId).not.toBeNull();
+        // Vite's resolver canonicalizes through realpath, so on macOS the
+        // result lives under `/private/var/...` while os.tmpdir() returns
+        // `/var/...`. Compare against realpath-canonicalized targets.
+        const normalized = normalize(resolvedId!);
+        const overrideDir = normalize(realpathSync(join(projectRoot, "override-src")));
+        const tsconfigDir = normalize(realpathSync(join(projectRoot, "src")));
+        // The explicit alias must win — the resolved id lives under
+        // `override-src/`, not the tsconfig-derived `src/`.
+        expect(normalized.startsWith(overrideDir)).toBe(true);
+        expect(normalized.startsWith(tsconfigDir + "/")).toBe(false);
       } finally {
         await server.close();
       }
