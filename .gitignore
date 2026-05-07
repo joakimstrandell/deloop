@@ -24,3 +24,6 @@ test-results/
 
 # CPTO pre-spawn handoff files (session-local; see AGENTS.md Session Hygiene).
 .claude/handoffs/
+
+# Claudes worktrees
+.claude/worktrees
