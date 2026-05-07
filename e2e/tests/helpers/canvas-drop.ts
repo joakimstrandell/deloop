@@ -14,8 +14,7 @@
  * carrying the same MIME payload.
  */
 import type { Page } from "@playwright/test";
-
-const COMPONENT_DRAG_MIME = "application/x-deloop-component";
+import { COMPONENT_DRAG_MIME } from "../../../packages/app/src/component-drag.js";
 
 interface ComponentInfo {
   name: string;
@@ -69,6 +68,41 @@ export async function dropComponentOnCanvas(
   if (!frame) {
     throw new Error("Canvas iframe not loaded — did you call page.goto first?");
   }
+
+  // Wait for the iframe's React tree to hydrate AND the document-level
+  // drag/drop listeners to be attached before dispatching the synthetic
+  // drop. Without this wait, callers running immediately after sidebar
+  // setup can race the iframe: the synthetic drop fires before
+  // `IframeApp`'s drop-listener `useEffect` has run, and the event is
+  // silently lost — manifests as flake under parallel workers.
+  //
+  // Readiness signal chosen: dispatch a probe `dragover` carrying our
+  // MIME and check `event.defaultPrevented`. The iframe's handler calls
+  // `preventDefault()` only when it matches `COMPONENT_DRAG_MIME`, so
+  // `defaultPrevented === true` is positive proof the document-level
+  // listener is installed and recognizes our payload — strictly
+  // stronger than checking for `data-deloop-chrome-host` alone (the
+  // host attribute is present after React's first commit, but the
+  // listener-attaching `useEffect` runs in a separate tick afterward).
+  //
+  // The probe dragover does flip `dragOver` state in the iframe (a side
+  // effect of `preventDefault`-ing the spec-required precursor), but the
+  // real dropComponentOnCanvas dispatches its own dragover anyway, so
+  // the state is the same as it would be on a real drag.
+  await frame.waitForFunction(
+    (mime) => {
+      const probe = new Event("dragover", { bubbles: true, cancelable: true });
+      const dt = new DataTransfer();
+      dt.setData(mime, "{}");
+      Object.defineProperty(probe, "dataTransfer", { value: dt });
+      Object.defineProperty(probe, "clientX", { value: 0 });
+      Object.defineProperty(probe, "clientY", { value: 0 });
+      document.dispatchEvent(probe);
+      return probe.defaultPrevented === true;
+    },
+    COMPONENT_DRAG_MIME,
+    { timeout: 10_000 },
+  );
 
   await frame.evaluate(
     ({ component, mime, x, y }) => {
