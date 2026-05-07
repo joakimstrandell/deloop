@@ -15,6 +15,7 @@
  * run only against that project.
  */
 import { test, expect } from "@playwright/test";
+import { dropComponentOnCanvas } from "./helpers/canvas-drop.js";
 
 test.describe("tsconfig.app.json path-alias propagation", () => {
   test("a component importing @/lib/utils mounts in the canvas", async ({ page }) => {
@@ -28,12 +29,18 @@ test.describe("tsconfig.app.json path-alias propagation", () => {
 
     await page.goto("/");
 
+    // Wait for the canvas iframe to be ready before dispatching the
+    // synthetic drop — matches the AWK-14 test pattern.
+    await expect(page.getByText("Canvas ready")).toBeVisible({ timeout: 10_000 });
+
     // The fixture's shim discovery surfaces an `Example` entry in the
-    // sidebar; clicking it must mount the component without source edits.
+    // sidebar; dragging it onto the canvas must mount the component
+    // without source edits. (Click-to-mount was removed in AWK-14;
+    // drag-and-drop is the only mount affordance now.)
     await expect(page.getByRole("button", { name: "Example", exact: true })).toBeVisible({
       timeout: 10_000,
     });
-    await page.getByRole("button", { name: "Example", exact: true }).click();
+    await dropComponentOnCanvas(page, "Example", 150, 200);
 
     const canvas = page.frameLocator("iframe#canvas");
     // The component renders text `Example: alias-resolved` — proving the
