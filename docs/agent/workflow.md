@@ -66,7 +66,7 @@ The milestone PRD and the Linear milestone are the same scope from two angles. T
 2. **Milestone-assign** — when scope is firm, the `mN-` prefix locks the PRD to Linear milestone N. Both must exist; the PRD's header references the Linear milestone, the Linear milestone references the PRD path.
 3. **Decompose** — break the PRD's Scope into Linear issues (use `/to-issues`). Each issue's description includes `PRD: docs/prd/mN-<slug>.md`. Issues are the workable units; the PRD's Scope sections are the durable shape.
 4. **Mutate during ideation or kickoff** — scope is not frozen at grill time. Issues may be added, split, retitled, or rescoped during ideation, `/kickoff` grilling, or implementation. New issues belong to the milestone; redefined issues stay in the milestone unless they no longer fit.
-5. **Sync back to PRD** — when issues are added, removed, or substantially redefined, the PRD's Scope or Out-of-scope sections are updated in the same change. The invariant is at milestone-level grain: the PRD describes *what the milestone delivers*, not every issue ID. Issue splits and AC tweaks inside an existing scope bullet do not require a PRD edit; new scope bullets and dropped scope do.
+5. **Sync back to PRD** — when issues are added, removed, or substantially redefined, the PRD's Scope or Out-of-scope sections are updated in the same change. The invariant is at milestone-level grain: the PRD describes _what the milestone delivers_, not every issue ID. Issue splits and AC tweaks inside an existing scope bullet do not require a PRD edit; new scope bullets and dropped scope do.
 
 When the PRD and Linear disagree, neither wins automatically — the disagreement is a smell. CPTO reconciles by editing whichever is wrong.
 

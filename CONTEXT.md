@@ -95,7 +95,7 @@ _Avoid_: file change, watch event, component update
 - The **Shell** owns the list of **Component entries**; the **Canvas** owns the **Cards** and the rendered Screen.
 - A **Discovery event** mutates the **Shell**'s set of **Component entries**, never the **Cards**.
 - **Shim** and **Screen** are the only kinds today; the kind-infix file convention (ADR-0007) is the extension point for future kinds.
-- **Standalone**, **Slot**, and **Compound** describe the *role* a Shim-kind Component entry plays in a design system; Slot entries are typically composed inside a Compound shim rather than exposed on their own.
+- **Standalone**, **Slot**, and **Compound** describe the _role_ a Shim-kind Component entry plays in a design system; Slot entries are typically composed inside a Compound shim rather than exposed on their own.
 - The **Inspector** in Screens mode reads the rendered DOM and writes back to the **Screen file** (the only file kind Deloop edits, per ADR-0008).
 
 ## Example dialogue
