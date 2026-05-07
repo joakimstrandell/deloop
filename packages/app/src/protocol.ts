@@ -11,6 +11,7 @@
  */
 import type {
   ColorScheme,
+  ComponentInfo,
   IframeToShellMessage,
   PseudoState,
   ShellToIframeMessage,
@@ -36,20 +37,52 @@ function isPlainProps(value: unknown): value is Record<string, unknown> {
   return isObject(value) && !Array.isArray(value);
 }
 
+/**
+ * Finite-number guard used for x,y coordinates on the wire.
+ *
+ * `typeof NaN === "number"` and `typeof Infinity === "number"` so a bare
+ * `typeof === "number"` would let nonsense through. Card placement is
+ * load-bearing for AWK-14 and these would translate to `NaN`/`Infinity`
+ * pixel values, which CSS rejects silently.
+ */
+function isFiniteNumber(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value);
+}
+
+/**
+ * Validates a `ComponentInfo` payload received over the wire (from the
+ * iframe's `componentDropped` message). Mirrors the shim-only discovery
+ * shape from `types.ts` — same string fields, no extras.
+ */
+function isComponentInfo(value: unknown): value is ComponentInfo {
+  if (!isObject(value)) return false;
+  const { name, path, relativePath } = value;
+  return (
+    typeof name === "string" &&
+    name.length > 0 &&
+    typeof path === "string" &&
+    path.length > 0 &&
+    typeof relativePath === "string" &&
+    relativePath.length > 0
+  );
+}
+
 export function parseShellToIframeMessage(input: unknown): ShellToIframeMessage | null {
   if (!isObject(input)) return null;
 
   switch (input["type"]) {
     case "mount": {
-      const { cardId, componentPath, componentName, props } = input;
+      const { cardId, componentPath, componentName, props, x, y } = input;
       if (
         typeof cardId === "string" &&
         typeof componentPath === "string" &&
         typeof componentName === "string" &&
         componentName.length > 0 &&
-        isPlainProps(props)
+        isPlainProps(props) &&
+        isFiniteNumber(x) &&
+        isFiniteNumber(y)
       ) {
-        return { type: "mount", cardId, componentPath, componentName, props };
+        return { type: "mount", cardId, componentPath, componentName, props, x, y };
       }
       return null;
     }
@@ -105,8 +138,15 @@ export function parseIframeToShellMessage(input: unknown): IframeToShellMessage 
     }
     case "cardMoved": {
       const { cardId, x, y } = input;
-      if (typeof cardId === "string" && typeof x === "number" && typeof y === "number") {
+      if (typeof cardId === "string" && isFiniteNumber(x) && isFiniteNumber(y)) {
         return { type: "cardMoved", cardId, x, y };
+      }
+      return null;
+    }
+    case "componentDropped": {
+      const { component, x, y } = input;
+      if (isComponentInfo(component) && isFiniteNumber(x) && isFiniteNumber(y)) {
+        return { type: "componentDropped", component, x, y };
       }
       return null;
     }

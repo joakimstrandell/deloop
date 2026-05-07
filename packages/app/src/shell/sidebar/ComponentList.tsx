@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type DragEvent } from "react";
+import { COMPONENT_DRAG_MIME } from "../../component-drag.js";
 import type { ComponentInfo } from "../../types.js";
 
 /**
@@ -9,23 +10,29 @@ import type { ComponentInfo } from "../../types.js";
  * a one-shot `GET /api/components`; on EventSource reconnect we re-fetch
  * REST to recover any events missed during the disconnect window.
  *
- * Drag protocol (AWK-12 → AWK-14):
+ * Drag protocol (AWK-14):
  *
  * Each list item is `draggable`; on `dragstart` we set:
  *   - `application/x-deloop-component`: JSON of the full ComponentInfo.
- *     Custom MIME so only Deloop-aware drop targets accept it. AWK-14's
- *     canvas drop zone reads this to know what to mount.
+ *     Custom MIME so only Deloop-aware drop targets accept it. The canvas
+ *     iframe reads this on `drop` to know what to mount.
  *   - `text/plain`: the component's `relativePath`. Universal fallback so
  *     drags into a textarea / file dialog produce a sensible string.
  *
  * The drag image is a custom "chip" rendered from a hidden DOM-attached
  * node — Safari ignores `setDragImage` if the node isn't in the DOM.
  *
- * Click-to-mount remains as a transitional bridge until the canvas drop
- * target lands in AWK-14; remove `onClick` once AWK-14 ships.
+ * Click-to-mount was a transitional bridge from AWK-12 and was removed
+ * here in AWK-14. Drag-and-drop is now the only way to put a component
+ * on the canvas, which keeps the click affordance available for future
+ * sidebar selection semantics (preview, jump-to-source, etc.) without
+ * conflicting with the drop flow.
  */
 
-export const COMPONENT_DRAG_MIME = "application/x-deloop-component";
+// COMPONENT_DRAG_MIME is shared with the iframe drop target — see
+// ../../component-drag.ts. Re-exporting here keeps the existing import
+// path stable for any consumer that imports from this module.
+export { COMPONENT_DRAG_MIME };
 
 /**
  * Populates a drag-event `dataTransfer` with the Deloop component drag
@@ -52,11 +59,7 @@ export function setComponentDragPayload(
   }
 }
 
-interface Props {
-  onSelect: (component: ComponentInfo) => void;
-}
-
-export function ComponentList({ onSelect }: Props) {
+export function ComponentList() {
   const [components, setComponents] = useState<ComponentInfo[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -160,7 +163,6 @@ export function ComponentList({ onSelect }: Props) {
                 type="button"
                 draggable
                 title={component.relativePath}
-                onClick={() => onSelect(component)}
                 onDragStart={(e) => handleDragStart(e, component)}
                 onDragEnd={handleDragEnd}
                 className={[

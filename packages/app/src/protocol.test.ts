@@ -13,15 +13,73 @@ import { describe, it, expect } from "vitest";
 import { parseShellToIframeMessage, parseIframeToShellMessage } from "./protocol.js";
 
 describe("parseShellToIframeMessage", () => {
-  it("accepts a well-formed mount message", () => {
+  it("accepts a well-formed mount message with x,y coordinates", () => {
     const msg = {
       type: "mount",
       cardId: "card-1",
       componentPath: "/@fs/abs/Button.tsx",
       componentName: "Button",
       props: { label: "Hello" },
+      x: 120,
+      y: 240,
     };
     expect(parseShellToIframeMessage(msg)).toEqual(msg);
+  });
+
+  it("accepts a mount message at the origin (0,0)", () => {
+    // Zero is a valid coordinate — the canvas origin.
+    const msg = {
+      type: "mount",
+      cardId: "card-1",
+      componentPath: "/@fs/abs/Button.tsx",
+      componentName: "Button",
+      props: {},
+      x: 0,
+      y: 0,
+    };
+    expect(parseShellToIframeMessage(msg)).toEqual(msg);
+  });
+
+  it("accepts a mount message with negative coordinates", () => {
+    // No clamping per AWK-14 locked scope — negative values are valid
+    // (e.g., a card panned off-screen and reanchored beyond the origin).
+    const msg = {
+      type: "mount",
+      cardId: "card-1",
+      componentPath: "/@fs/abs/Button.tsx",
+      componentName: "Button",
+      props: {},
+      x: -50,
+      y: -30,
+    };
+    expect(parseShellToIframeMessage(msg)).toEqual(msg);
+  });
+
+  it("rejects mount missing x or y", () => {
+    const base = {
+      type: "mount",
+      cardId: "card-1",
+      componentPath: "/@fs/abs/Button.tsx",
+      componentName: "Button",
+      props: {},
+    };
+    expect(parseShellToIframeMessage({ ...base, y: 0 })).toBeNull();
+    expect(parseShellToIframeMessage({ ...base, x: 0 })).toBeNull();
+    expect(parseShellToIframeMessage(base)).toBeNull();
+  });
+
+  it("rejects mount when x or y is non-numeric", () => {
+    const base = {
+      type: "mount",
+      cardId: "card-1",
+      componentPath: "/@fs/abs/Button.tsx",
+      componentName: "Button",
+      props: {},
+    };
+    expect(parseShellToIframeMessage({ ...base, x: "10", y: 20 })).toBeNull();
+    expect(parseShellToIframeMessage({ ...base, x: 10, y: null })).toBeNull();
+    expect(parseShellToIframeMessage({ ...base, x: NaN, y: 20 })).toBeNull();
+    expect(parseShellToIframeMessage({ ...base, x: Infinity, y: 20 })).toBeNull();
   });
 
   it("accepts unmount", () => {
@@ -57,6 +115,8 @@ describe("parseShellToIframeMessage", () => {
         componentPath: "/x",
         componentName: "Button",
         props: {},
+        x: 0,
+        y: 0,
       }),
     ).toBeNull();
   });
@@ -68,6 +128,8 @@ describe("parseShellToIframeMessage", () => {
         cardId: "x",
         componentPath: "/x",
         props: {},
+        x: 0,
+        y: 0,
       }),
     ).toBeNull();
   });
@@ -80,6 +142,8 @@ describe("parseShellToIframeMessage", () => {
         componentPath: "/x",
         componentName: 42,
         props: {},
+        x: 0,
+        y: 0,
       }),
     ).toBeNull();
     expect(
@@ -89,6 +153,8 @@ describe("parseShellToIframeMessage", () => {
         componentPath: "/x",
         componentName: "",
         props: {},
+        x: 0,
+        y: 0,
       }),
     ).toBeNull();
   });
@@ -112,6 +178,8 @@ describe("parseShellToIframeMessage", () => {
         componentPath: "/x",
         componentName: "Button",
         props: ["not", "an", "object"],
+        x: 0,
+        y: 0,
       }),
     ).toBeNull();
     expect(parseShellToIframeMessage({ type: "updateProps", cardId: "x", props: [] })).toBeNull();
@@ -171,5 +239,57 @@ describe("parseIframeToShellMessage", () => {
   it("rejects null and unknown shapes", () => {
     expect(parseIframeToShellMessage(null)).toBeNull();
     expect(parseIframeToShellMessage({ type: "boom" })).toBeNull();
+  });
+
+  it("accepts a well-formed componentDropped message", () => {
+    const msg = {
+      type: "componentDropped",
+      component: {
+        name: "Button",
+        path: "/abs/path/to/button.deloop.tsx",
+        relativePath: "src/components/button.deloop.tsx",
+      },
+      x: 100,
+      y: 200,
+    };
+    expect(parseIframeToShellMessage(msg)).toEqual(msg);
+  });
+
+  it("rejects componentDropped when component is malformed", () => {
+    const baseDrop = {
+      type: "componentDropped",
+      x: 0,
+      y: 0,
+    };
+    // Missing fields.
+    expect(parseIframeToShellMessage({ ...baseDrop, component: {} })).toBeNull();
+    expect(parseIframeToShellMessage({ ...baseDrop, component: { name: "Button" } })).toBeNull();
+    // Wrong field types.
+    expect(
+      parseIframeToShellMessage({
+        ...baseDrop,
+        component: { name: 42, path: "/x", relativePath: "x" },
+      }),
+    ).toBeNull();
+    // Empty strings — shim discovery never produces empty identifiers.
+    expect(
+      parseIframeToShellMessage({
+        ...baseDrop,
+        component: { name: "", path: "/x", relativePath: "x" },
+      }),
+    ).toBeNull();
+    // Component not an object.
+    expect(parseIframeToShellMessage({ ...baseDrop, component: null })).toBeNull();
+  });
+
+  it("rejects componentDropped with non-numeric coordinates", () => {
+    const component = { name: "Button", path: "/abs", relativePath: "src/x.tsx" };
+    expect(
+      parseIframeToShellMessage({ type: "componentDropped", component, x: "10", y: 20 }),
+    ).toBeNull();
+    expect(
+      parseIframeToShellMessage({ type: "componentDropped", component, x: 10, y: NaN }),
+    ).toBeNull();
+    expect(parseIframeToShellMessage({ type: "componentDropped", component })).toBeNull();
   });
 });

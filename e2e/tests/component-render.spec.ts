@@ -11,8 +11,14 @@
  * ships `button.deloop.tsx` (trivial leaf) and `tooltip.deloop.tsx`
  * (provider-wrapping compound) as canonical examples — the assertions
  * below verify both shim shapes mount correctly end-to-end.
+ *
+ * AWK-14: components arrive on the canvas via drag-and-drop now (not
+ * sidebar click). Tests that just need a mounted card use the
+ * `dropComponentOnCanvas` helper to synthesise the drop event — see
+ * canvas-placement.spec.ts for full drop-flow coverage.
  */
 import { test, expect } from "@playwright/test";
+import { dropComponentOnCanvas } from "./helpers/canvas-drop.js";
 
 test.describe("component list", () => {
   test("shows Button and Tooltip from @deloop/ui shims", async ({ page }) => {
@@ -29,15 +35,17 @@ test.describe("component list", () => {
 });
 
 test.describe("canvas rendering", () => {
-  test("clicking Button mounts it in the canvas iframe", async ({ page }) => {
+  test("dropping a Button mounts it in the canvas iframe", async ({ page }) => {
     await page.goto("/");
 
     await expect(page.getByRole("button", { name: "Button", exact: true })).toBeVisible({
       timeout: 10_000,
     });
 
-    // Click the Button entry in the sidebar.
-    await page.getByRole("button", { name: "Button", exact: true }).click();
+    // Synthesise a sidebar → canvas drop (AWK-14). Playwright can't
+    // drive HTML5 drag/drop reliably across iframe boundaries; the
+    // helper dispatches the drop event directly with the right MIME.
+    await dropComponentOnCanvas(page, "Button", 100, 100);
 
     // The canvas iframe should render a component card containing the button.
     const canvas = page.frameLocator("iframe#canvas");
@@ -47,7 +55,7 @@ test.describe("canvas rendering", () => {
   test("renders chrome inside shadow DOM and user component in light DOM (slotted)", async ({
     page,
   }) => {
-    // AWK-13: Deloop's canvas chrome (grid + card frame + label + error
+    // AWK-13: Deloop's canvas chrome (canvas + card frame + label + error
     // frame) lives inside an open shadow root attached to a host element;
     // the user component is a light-DOM child of that host with
     // `slot="card-<cardId>"`. This isolates Deloop's CSS from the user
@@ -58,7 +66,7 @@ test.describe("canvas rendering", () => {
     await expect(page.getByRole("button", { name: "Button", exact: true })).toBeVisible({
       timeout: 10_000,
     });
-    await page.getByRole("button", { name: "Button", exact: true }).click();
+    await dropComponentOnCanvas(page, "Button", 100, 100);
 
     // Wait for the user's button to appear in the canvas.
     const canvas = page.frameLocator("iframe#canvas");
@@ -119,7 +127,7 @@ test.describe("canvas rendering", () => {
     await expect(page.getByRole("button", { name: "Button", exact: true })).toBeVisible({
       timeout: 10_000,
     });
-    await page.getByRole("button", { name: "Button", exact: true }).click();
+    await dropComponentOnCanvas(page, "Button", 100, 100);
 
     const canvas = page.frameLocator("iframe#canvas");
     await expect(canvas.getByRole("button", { name: "Button" })).toBeVisible({ timeout: 10_000 });
@@ -130,7 +138,7 @@ test.describe("canvas rendering", () => {
     expect(linkCount).toBe(1);
   });
 
-  test("clicking Tooltip mounts a fully composed tooltip without console errors", async ({
+  test("dropping Tooltip mounts a fully composed tooltip without console errors", async ({
     page,
   }) => {
     // Validates the provider-wrapping shim path (ADR-0005): a `Tooltip`
@@ -151,7 +159,7 @@ test.describe("canvas rendering", () => {
       timeout: 10_000,
     });
 
-    await page.getByRole("button", { name: "Tooltip", exact: true }).click();
+    await dropComponentOnCanvas(page, "Tooltip", 120, 120);
 
     // The shim renders a "Hover me" Button as the trigger; its presence in
     // the iframe is enough to prove the composition mounted without

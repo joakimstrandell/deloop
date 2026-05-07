@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ComponentList } from "./sidebar/ComponentList.js";
 import { ColorSchemeToggle } from "./ColorSchemeToggle.js";
+import { addCard, moveCard, type ShellCardState } from "./card-state.js";
 import { parseIframeToShellMessage } from "../protocol.js";
 import {
   type ColorSchemeMode,
@@ -9,11 +10,6 @@ import {
   writeStoredMode,
 } from "../color-scheme.js";
 import type { ColorScheme, ComponentInfo, ShellToIframeMessage } from "../types.js";
-
-interface SelectedCard {
-  cardId: string;
-  component: ComponentInfo;
-}
 
 /**
  * Three-zone Deloop shell (AWK-10):
@@ -29,12 +25,25 @@ interface SelectedCard {
  * The shell uses standard Tailwind classes — no `wb-` prefix. Style isolation
  * between shell and canvas is enforced by the iframe boundary itself, per
  * ADR-0001. All shell ↔ iframe communication goes through `postMessage`.
+ *
+ * Card lifecycle (AWK-14):
+ *   - Drop on canvas: iframe posts `componentDropped`; shell mints a
+ *     UUID, stores `{cardId → CardEntry}`, sends `mount` back with x,y.
+ *   - Click on card chrome: iframe posts `cardSelected`; shell looks up
+ *     the entry and surfaces it in the right panel.
+ *   - Drag on canvas: iframe posts `cardMoved` once on pointer-up; shell
+ *     updates the stored x,y in place.
  */
 export function App() {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const queuedMessages = useRef<ShellToIframeMessage[]>([]);
   const [iframeReady, setIframeReady] = useState(false);
-  const [selected, setSelected] = useState<SelectedCard | null>(null);
+  // Card registry: cardId → component + position. The shell owns this;
+  // the iframe is a renderer of mount messages and never invents cards
+  // on its own. Transitions go through pure helpers in `./card-state.ts`
+  // so AWK-14's drop/move/select acceptance criteria are unit-testable.
+  const [cards, setCards] = useState<ShellCardState>(() => new Map());
+  const [selectedId, setSelectedId] = useState<string | null>(null);
 
   // The user's preferred mode (light / dark / system). The wire only
   // ever carries a resolved scheme; this state is the single source of
@@ -52,6 +61,34 @@ export function App() {
     } else {
       queuedMessages.current.push(msg);
     }
+  }
+
+  /**
+   * Handles a sidebar drop on the canvas (AWK-14). The iframe owns the
+   * native `drop` event and surfaces it as a `componentDropped` uplink;
+   * the shell mints the cardId so it remains the source of truth for
+   * the card list.
+   */
+  function handleComponentDropped(component: ComponentInfo, x: number, y: number): void {
+    // crypto.randomUUID is available in every browser the shell targets
+    // (modern Chromium/Firefox/Safari + a TLS-or-localhost origin, which
+    // covers Vite's dev server and any production deployment).
+    const cardId = crypto.randomUUID();
+    setCards((prev) => addCard(prev, cardId, component, x, y));
+    setSelectedId(cardId);
+    send({
+      type: "mount",
+      cardId,
+      // Vite's /@fs/ prefix allows the browser to import absolute filesystem
+      // paths that are within server.fs.allow. See ADR-0002.
+      componentPath: `/@fs${component.path}`,
+      // The iframe resolves `mod[componentName]` strictly — no fallback.
+      // The entry's `name` is a verbatim shim export identifier (ADR-0005).
+      componentName: component.name,
+      props: {},
+      x,
+      y,
+    });
   }
 
   useEffect(() => {
@@ -73,19 +110,34 @@ export function App() {
           queuedMessages.current = [];
           break;
         case "cardSelected":
-          // Selection currently flows top-down from the sidebar; we record
-          // the iframe's selection signal but don't reconcile it back yet.
+          // Promote the iframe's selection signal into shell state so
+          // the right panel reflects the chosen canvas card. The
+          // ComponentInfo lookup goes through the shell's card map —
+          // the iframe never ships full component metadata on selection.
+          setSelectedId(msg.cardId);
           break;
         case "cardMoved":
-          // Card movement is part of AWK-10's protocol surface; the
-          // pan/zoom canvas that produces these is a follow-up issue.
+          // Persist the new position in the shell's card registry. No
+          // `mount` echo back to the iframe — the iframe already moved
+          // the card optimistically during the drag (locked scope: one
+          // wire message at end of drag).
+          setCards((prev) => moveCard(prev, msg.cardId, msg.x, msg.y));
+          break;
+        case "componentDropped":
+          handleComponentDropped(msg.component, msg.x, msg.y);
           break;
       }
     }
 
     window.addEventListener("message", handleMessage);
     return () => window.removeEventListener("message", handleMessage);
-  }, []);
+    // `handleMessage` closes over `handleComponentDropped` and `send`,
+    // both of which read `iframeReady`. Re-attach the listener whenever
+    // `iframeReady` flips so a `componentDropped` arriving after the
+    // iframe is ready doesn't see a stale `iframeReady=false` closure
+    // and silently queue the resulting `mount` forever.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [iframeReady]);
 
   /*
    * One matchMedia listener per shell, by design (AWK-79 decision 2).
@@ -137,21 +189,7 @@ export function App() {
     setMode((prev) => (prev === "light" ? "dark" : prev === "dark" ? "system" : "light"));
   }, []);
 
-  function mountComponent(component: ComponentInfo) {
-    const cardId = component.name;
-    setSelected({ cardId, component });
-    send({
-      type: "mount",
-      cardId,
-      // Vite's /@fs/ prefix allows the browser to import absolute filesystem
-      // paths that are within server.fs.allow. See ADR-0002.
-      componentPath: `/@fs${component.path}`,
-      // The iframe resolves `mod[componentName]` strictly — no fallback.
-      // The entry's `name` is a verbatim shim export identifier (ADR-0005).
-      componentName: component.name,
-      props: {},
-    });
-  }
+  const selected = selectedId != null ? (cards.get(selectedId) ?? null) : null;
 
   return (
     <div className="flex h-screen flex-col bg-neutral-950 text-neutral-200">
@@ -180,7 +218,7 @@ export function App() {
               Components
             </h2>
           </div>
-          <ComponentList onSelect={mountComponent} />
+          <ComponentList />
         </aside>
 
         <main data-zone="canvas" className="relative min-w-0 flex-1 overflow-hidden">

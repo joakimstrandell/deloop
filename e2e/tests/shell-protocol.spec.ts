@@ -35,9 +35,11 @@ test.describe("AWK-10 shell + protocol", () => {
     // Wait for iframeReady so the message bus is open in both directions.
     await expect(page.getByText("Canvas ready")).toBeVisible({ timeout: 10_000 });
 
-    // Send a synthetic `mount` directly (no sidebar click) — this isolates
-    // the shell→iframe protocol from the component discovery pipeline.
-    // Pin targetOrigin to window.location.origin to mirror production sends.
+    // Send a synthetic `mount` directly (no sidebar drop) — this isolates
+    // the shell→iframe protocol from the discovery + drop pipeline. Pin
+    // targetOrigin to window.location.origin to mirror production sends.
+    // x,y are required by the protocol (AWK-14) and just position the
+    // placeholder somewhere visible.
     await page.evaluate(() => {
       const iframe = document.querySelector<HTMLIFrameElement>("iframe#canvas");
       iframe?.contentWindow?.postMessage(
@@ -47,6 +49,8 @@ test.describe("AWK-10 shell + protocol", () => {
           componentPath: "about:blank-not-a-real-module",
           componentName: "Placeholder",
           props: {},
+          x: 80,
+          y: 80,
         },
         window.location.origin,
       );
@@ -83,6 +87,8 @@ test.describe("AWK-10 shell + protocol", () => {
           componentPath: "about:blank",
           componentName: "ShouldNotAppear",
           props: {},
+          x: 0,
+          y: 0,
         },
         window.location.origin,
       );
@@ -105,6 +111,8 @@ test.describe("AWK-10 shell + protocol", () => {
           componentPath: "about:blank",
           componentName: "Legit",
           props: {},
+          x: 40,
+          y: 40,
         },
         window.location.origin,
       );

@@ -12,6 +12,7 @@
  *   - The choice persists across reloads via `localStorage`.
  */
 import { test, expect, type Page } from "@playwright/test";
+import { dropComponentOnCanvas } from "./helpers/canvas-drop.js";
 
 const STORAGE_KEY = "deloop:color-scheme";
 
@@ -88,10 +89,11 @@ test.describe("AWK-79 canvas color-scheme toggle", () => {
     await page.goto("/");
 
     // Mount a Button so we have a known token to assert against.
+    // AWK-14: drag-and-drop replaced click-to-mount; synthesise the drop.
     await expect(page.getByRole("button", { name: "Button", exact: true })).toBeVisible({
       timeout: 10_000,
     });
-    await page.getByRole("button", { name: "Button", exact: true }).click();
+    await dropComponentOnCanvas(page, "Button", 100, 100);
 
     const canvas = page.frameLocator("iframe#canvas");
     await expect(canvas.getByRole("button", { name: "Button" })).toBeVisible({ timeout: 10_000 });
