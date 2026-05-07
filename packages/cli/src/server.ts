@@ -52,12 +52,27 @@ export async function startServer({ root, port, open }: ServerOptions): Promise<
     userAliases: config.resolve?.alias ?? {},
   };
 
+  // AWK-91: Source `optimizeDeps.entries` from the registry's discovered
+  // component shims so Vite pre-bundles every transitively reachable
+  // bare-import dep at server boot. Without this, the first iframe import
+  // of a user component triggers a depOptimize rerun → full iframe reload
+  // → placed cards vanish mid-session. `registry.list()` is a cheap cache
+  // read here (the registry was just constructed and `discoverComponents`
+  // has already run synchronously); we await it to feed Vite's
+  // `createServer` call below. Empty list → no entries → previous default
+  // behaviour preserved.
+  const components = await registry.list();
+  const optimizeDepsEntries = components.map((c) => c.path);
+
   // Pass `httpServer` to Vite so its HMR WebSocket attaches to our
   // existing HTTP server instead of opening a fresh socket on the
   // default port 24678. Two CLI instances on different ports can then
   // coexist (e.g. parallel Playwright webServers). Without this, the
   // second instance fails to bind 24678 and clients reconnect-loop.
-  const vite = await createViteComponentServer(root, style, resolveConfig, { httpServer });
+  const vite = await createViteComponentServer(root, style, resolveConfig, {
+    httpServer,
+    optimizeDepsEntries,
+  });
 
   // REST API — first paint of the sidebar reads this once. Subsequent
   // updates flow through the SSE channel below.

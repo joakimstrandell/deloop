@@ -679,6 +679,55 @@ describe("AWK-75 tsconfig path-alias propagation", () => {
       }
     });
 
+    it("threads optimizeDepsEntries into the Vite config (AWK-91)", async () => {
+      // AWK-91: `optimizeDepsEntries` is the load-bearing config that
+      // pre-bundles every transitively-reachable bare-import dep at
+      // server boot. Without it, the first iframe import of a user
+      // component triggers Vite's depOptimizer rerun → full iframe
+      // page reload → placed cards vanish. We assert here that the
+      // entries make it onto Vite's resolved config so a regression in
+      // the threading doesn't go unnoticed at the unit level.
+      const projectRoot = makeProjectRoot();
+      mkdirSync(join(projectRoot, "src", "components"), { recursive: true });
+      const shimPath = join(projectRoot, "src", "components", "button.deloop.tsx");
+      writeFile(shimPath, `export function Button() { return null; }\n`);
+
+      const server = await createViteComponentServer(
+        projectRoot,
+        { cssPaths: [], componentsDir: null },
+        { userAliases: {} },
+        { optimizeDepsEntries: [shimPath] },
+      );
+      try {
+        // Vite normalizes `optimizeDeps.entries` to an array of strings
+        // on the resolved config (the user can pass a single string or
+        // an array). Coerce to an array for a stable shape, then assert
+        // our shim path is in there.
+        const entries = server.config.optimizeDeps.entries;
+        const asArray = Array.isArray(entries) ? entries : entries == null ? [] : [entries];
+        expect(asArray).toContain(shimPath);
+      } finally {
+        await server.close();
+      }
+    });
+
+    it("does not set optimizeDeps.entries when the hook is omitted", async () => {
+      // AWK-91 regression guard: when no entries hook is supplied the
+      // resolved config must not carry our prewarm list (Vite's default
+      // behaviour stays unchanged for callers that haven't migrated).
+      const projectRoot = makeProjectRoot();
+      const server = await createViteComponentServer(projectRoot);
+      try {
+        const entries = server.config.optimizeDeps.entries;
+        const asArray = Array.isArray(entries) ? entries : entries == null ? [] : [entries];
+        // Vite may auto-discover its own HTML entries — what matters is
+        // that user shim paths are NOT among them when the hook is off.
+        expect(asArray).not.toContain(join(projectRoot, "src", "components", "button.deloop.tsx"));
+      } finally {
+        await server.close();
+      }
+    });
+
     it("does not crash on a malformed tsconfig — logs a warning and falls back to no aliases", async () => {
       const projectRoot = makeProjectRoot();
       writeFile(join(projectRoot, "tsconfig.json"), "{ broken json");

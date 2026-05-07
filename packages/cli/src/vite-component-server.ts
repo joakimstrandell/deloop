@@ -75,9 +75,21 @@ export interface CanvasResolveConfig {
  * is required when running multiple CLI instances side-by-side (e.g.
  * parallel Playwright webServers) — otherwise the second instance
  * collides on 24678 and HMR clients reconnect-loop endlessly.
+ *
+ * `optimizeDepsEntries` is the list of absolute shim paths sourced from
+ * the component registry at server-create time (AWK-91). Vite scans the
+ * module graph reachable from these entries during the cold dep-optimize
+ * pass, pre-bundling every bare-import dep transitively reachable through
+ * `@deloop/ui` shims (e.g. `class-variance-authority`, `radix-ui`,
+ * `clsx`, `tailwind-merge`). Without this, the optimizer discovers those
+ * deps lazily on the first iframe import, rebuilds the bundle, and fires
+ * a full page reload to swap the iframe over to the freshly-bundled deps
+ * — the reload tears down placed cards mid-session. See AWK-91 PR for
+ * the diagnostic trace.
  */
 export interface CanvasServerHooks {
   httpServer?: HttpServer;
+  optimizeDepsEntries?: readonly string[];
 }
 
 export async function createViteComponentServer(
@@ -148,6 +160,39 @@ export async function createViteComponentServer(
     }
   }
 
+  // AWK-91: Pre-discover Vite optimizeDeps from the component registry.
+  //
+  // Default behaviour (no `entries` set): Vite seeds the dep-optimizer scan
+  // from the configured `index.html` entries (here: `iframe.html` + the
+  // shell's `index.html`). Neither HTML reaches user shim modules until the
+  // browser dynamically imports one — so when the iframe runs its first
+  // `import("/@fs/<shim>")` after a drop, the optimizer discovers a fresh
+  // batch of bare-import deps reachable through that shim
+  // (`class-variance-authority`, `radix-ui`, `clsx`, `tailwind-merge`, …),
+  // rebuilds the optimized bundle, and triggers a full iframe page reload
+  // to swap the runtime over to the new bundle. The reload tears down the
+  // iframe's placed-card map → cards vanish mid-session.
+  //
+  // Fix shape: hand Vite the registry's absolute shim paths as
+  // `optimizeDeps.entries` BEFORE `createServer()`. The optimizer scans
+  // those entries' module graphs at boot, pre-bundling every reachable dep
+  // before any browser request arrives. First drop hits a warm cache → no
+  // rebuild → no reload.
+  //
+  // Hardcoded include lists were rejected (fragile, reaches into user
+  // dep tree). Disabling depOptimize was rejected (regresses cold transform
+  // speed). See AWK-91 issue for the locked-scope decision.
+  //
+  // Watch interaction: entries are read at server-create time. When a user
+  // adds a NEW shim while the dev server is running, that file is not in
+  // the entries list and may still trigger a reload on its first import
+  // until next `pnpm dev` restart. AWK-91 takes Option A (cold-boot-only
+  // guarantee, simpler blast radius) and files a follow-up issue for the
+  // watcher-driven optimizer rerun.
+  const optimizeDepsEntries = hooks.optimizeDepsEntries
+    ? Array.from(hooks.optimizeDepsEntries)
+    : undefined;
+
   const server = await createServer({
     // Explicitly load packages/app's vite.config.ts so the Tailwind v4 plugin
     // and all other app-level plugins are included. Without this, Vite searches
@@ -172,6 +217,13 @@ export async function createViteComponentServer(
     resolve: {
       dedupe: ["react", "react-dom", "react/jsx-runtime"],
     },
+    ...(optimizeDepsEntries
+      ? {
+          optimizeDeps: {
+            entries: optimizeDepsEntries,
+          },
+        }
+      : {}),
     appType: "mpa",
     // Suppress Vite's own output; Deloop logs its own startup message
     logLevel: "warn",
