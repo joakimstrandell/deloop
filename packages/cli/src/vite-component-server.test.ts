@@ -1,9 +1,15 @@
-import { describe, it, expect, afterEach } from "vitest";
-import { mkdirSync, rmSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { describe, it, expect, afterEach, vi } from "vitest";
+import { mkdirSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { join, normalize } from "node:path";
 import { tmpdir } from "node:os";
-import { canvasStyleEnvironmentPlugin, resolveUserPath } from "./vite-component-server.js";
-import type { Plugin } from "vite";
+import {
+  canvasStyleEnvironmentPlugin,
+  collectTsconfigAliasTargets,
+  createUserAliasPlugin,
+  createViteComponentServer,
+  resolveUserPath,
+} from "./vite-component-server.js";
+import type { Plugin, UserConfig } from "vite";
 
 /**
  * Type helpers — Vite types `transformIndexHtml` and `transform` as
@@ -317,5 +323,302 @@ describe("resolveUserPath", () => {
 
   it("returns absolute paths unchanged", () => {
     expect(resolveUserPath("/repo/proj", "/abs/elsewhere.css")).toBe("/abs/elsewhere.css");
+  });
+});
+
+/**
+ * AWK-75: tsconfig path-alias propagation.
+ *
+ * These tests cover the four guarantees the spec calls out:
+ *  1. The plugin receives the correct `projects` paths (only existing
+ *     files are passed through).
+ *  2. `server.fs.allow` is expanded to include directories the resolved
+ *     aliases point at — both tsconfig-derived and explicit overrides.
+ *  3. Escape-hatch override precedence: when both tsconfig and
+ *     `.deloop/config.ts` define the same alias key, the explicit one
+ *     wins. This is asserted by checking plugin registration order.
+ *  4. Malformed / missing tsconfig falls back gracefully — no throw, a
+ *     single stderr warning, and the dev server still spins up.
+ */
+describe("AWK-75 tsconfig path-alias propagation", () => {
+  let tmpRoots: string[] = [];
+
+  function makeProjectRoot(): string {
+    const root = join(
+      tmpdir(),
+      `deloop-tsconfig-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    );
+    mkdirSync(root, { recursive: true });
+    tmpRoots.push(root);
+    return root;
+  }
+
+  function writeFile(path: string, contents: string): void {
+    mkdirSync(join(path, "..").replace(/\/[^/]+$/, ""), { recursive: true });
+    writeFileSync(path, contents, "utf8");
+  }
+
+  afterEach(() => {
+    for (const root of tmpRoots) {
+      rmSync(root, { recursive: true, force: true });
+    }
+    tmpRoots = [];
+  });
+
+  describe("collectTsconfigAliasTargets", () => {
+    it("resolves @/* paths against the tsconfig directory", async () => {
+      const root = makeProjectRoot();
+      mkdirSync(join(root, "src"), { recursive: true });
+      writeFile(
+        join(root, "tsconfig.json"),
+        JSON.stringify({
+          compilerOptions: {
+            baseUrl: ".",
+            paths: { "@/*": ["./src/*"] },
+          },
+        }),
+      );
+
+      const targets = await collectTsconfigAliasTargets([join(root, "tsconfig.json")]);
+
+      expect(targets).toContain(normalize(join(root, "src")));
+    });
+
+    it("resolves paths declared in tsconfig.app.json (the split case)", async () => {
+      const root = makeProjectRoot();
+      mkdirSync(join(root, "src"), { recursive: true });
+      writeFile(
+        join(root, "tsconfig.json"),
+        JSON.stringify({
+          files: [],
+          references: [{ path: "./tsconfig.app.json" }],
+        }),
+      );
+      writeFile(
+        join(root, "tsconfig.app.json"),
+        JSON.stringify({
+          compilerOptions: {
+            baseUrl: ".",
+            paths: { "@/*": ["./src/*"] },
+          },
+        }),
+      );
+
+      const targets = await collectTsconfigAliasTargets([
+        join(root, "tsconfig.json"),
+        join(root, "tsconfig.app.json"),
+      ]);
+
+      expect(targets).toContain(normalize(join(root, "src")));
+    });
+
+    it("follows extends chains and surfaces inherited paths", async () => {
+      const root = makeProjectRoot();
+      mkdirSync(join(root, "src"), { recursive: true });
+      // Base config holds the paths; the leaf merely extends it. tsconfck
+      // merges paths from the entire chain — the AC step (3) requirement.
+      writeFile(
+        join(root, "tsconfig.base.json"),
+        JSON.stringify({
+          compilerOptions: {
+            baseUrl: ".",
+            paths: { "@/*": ["./src/*"] },
+          },
+        }),
+      );
+      writeFile(
+        join(root, "tsconfig.json"),
+        JSON.stringify({
+          extends: "./tsconfig.base.json",
+          compilerOptions: {},
+        }),
+      );
+
+      const targets = await collectTsconfigAliasTargets([join(root, "tsconfig.json")]);
+
+      // tsconfck canonicalizes baseUrl through realpath, so on macOS the
+      // result lives under `/private/var/...` while os.tmpdir() returns
+      // the symlink form `/var/...`. Both refer to the same directory.
+      // Canonicalize the expectation to match.
+      const expected = normalize(join(realpathSync(root), "src"));
+      expect(targets).toContain(expected);
+    });
+
+    it("returns an empty list for a tsconfig with no paths field", async () => {
+      const root = makeProjectRoot();
+      writeFile(join(root, "tsconfig.json"), JSON.stringify({ compilerOptions: { baseUrl: "." } }));
+
+      const targets = await collectTsconfigAliasTargets([join(root, "tsconfig.json")]);
+
+      expect(targets).toEqual([]);
+    });
+
+    it("does not throw when the tsconfig is malformed; logs a single warning", async () => {
+      const root = makeProjectRoot();
+      writeFile(join(root, "tsconfig.json"), "{ this is not json");
+
+      const stderr = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+      try {
+        const targets = await collectTsconfigAliasTargets([join(root, "tsconfig.json")]);
+        expect(targets).toEqual([]);
+        expect(stderr).toHaveBeenCalled();
+      } finally {
+        stderr.mockRestore();
+      }
+    });
+
+    it("does not throw when the tsconfig file is missing entirely", async () => {
+      const root = makeProjectRoot();
+      const missing = join(root, "tsconfig.json");
+
+      const stderr = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+      try {
+        const targets = await collectTsconfigAliasTargets([missing]);
+        expect(targets).toEqual([]);
+      } finally {
+        stderr.mockRestore();
+      }
+    });
+  });
+
+  describe("createUserAliasPlugin", () => {
+    it("returns null when there are no aliases to register", () => {
+      const plugin = createUserAliasPlugin("/repo/proj", {});
+      expect(plugin).toBeNull();
+    });
+
+    it("emits a vite resolve.alias array with relative targets joined to projectRoot", () => {
+      const plugin = createUserAliasPlugin("/repo/proj", {
+        "@": "./src",
+        "@ui": "/abs/ui",
+      });
+      expect(plugin).not.toBeNull();
+      if (plugin == null) throw new Error("expected plugin");
+
+      const configFn = plugin.config as (() => UserConfig) | undefined;
+      expect(typeof configFn).toBe("function");
+      const cfg = configFn!.call({} as never) as UserConfig;
+      const aliasArray = cfg.resolve?.alias as { find: string; replacement: string }[] | undefined;
+
+      expect(aliasArray).toBeDefined();
+      expect(aliasArray!.find((a) => a.find === "@")?.replacement).toBe(
+        normalize("/repo/proj/src"),
+      );
+      expect(aliasArray!.find((a) => a.find === "@ui")?.replacement).toBe(normalize("/abs/ui"));
+    });
+
+    it("registers with `enforce: pre` so it runs before vite-tsconfig-paths", () => {
+      const plugin = createUserAliasPlugin("/repo/proj", { "@": "./src" });
+      expect(plugin).not.toBeNull();
+      expect(plugin?.enforce).toBe("pre");
+    });
+  });
+
+  describe("createViteComponentServer integration", () => {
+    it("expands server.fs.allow with tsconfig-derived alias directories", async () => {
+      const projectRoot = makeProjectRoot();
+      mkdirSync(join(projectRoot, "src"), { recursive: true });
+      writeFile(
+        join(projectRoot, "tsconfig.json"),
+        JSON.stringify({
+          compilerOptions: {
+            baseUrl: ".",
+            paths: { "@/*": ["./src/*"] },
+          },
+        }),
+      );
+
+      const server = await createViteComponentServer(projectRoot);
+      try {
+        const allow = server.config.server.fs.allow;
+        expect(allow).toEqual(expect.arrayContaining([normalize(join(projectRoot, "src"))]));
+        // Original entries are still present.
+        expect(allow).toEqual(expect.arrayContaining([projectRoot]));
+      } finally {
+        await server.close();
+      }
+    });
+
+    it("expands server.fs.allow with explicit user-alias targets too", async () => {
+      const projectRoot = makeProjectRoot();
+      const sibling = makeProjectRoot(); // different temp dir → outside projectRoot
+
+      const server = await createViteComponentServer(
+        projectRoot,
+        { cssPaths: [], componentsDir: null },
+        { userAliases: { "@sibling": sibling } },
+      );
+      try {
+        const allow = server.config.server.fs.allow;
+        expect(allow).toEqual(expect.arrayContaining([normalize(sibling)]));
+      } finally {
+        await server.close();
+      }
+    });
+
+    it("registers the user-alias plugin BEFORE vite-tsconfig-paths so explicit aliases win on key collision", async () => {
+      const projectRoot = makeProjectRoot();
+      mkdirSync(join(projectRoot, "src"), { recursive: true });
+      writeFile(
+        join(projectRoot, "tsconfig.json"),
+        JSON.stringify({
+          compilerOptions: {
+            baseUrl: ".",
+            paths: { "@/*": ["./src/*"] },
+          },
+        }),
+      );
+
+      const server = await createViteComponentServer(
+        projectRoot,
+        { cssPaths: [], componentsDir: null },
+        { userAliases: { "@": "./override-src" } },
+      );
+      try {
+        const plugins = server.config.plugins as { name: string }[];
+        const userIdx = plugins.findIndex((p) => p?.name === "deloop:user-aliases");
+        const tsconfigIdx = plugins.findIndex((p) => p?.name === "vite-tsconfig-paths");
+        expect(userIdx).toBeGreaterThanOrEqual(0);
+        expect(tsconfigIdx).toBeGreaterThanOrEqual(0);
+        // Plugins running with `enforce: 'pre'` run before non-`pre`
+        // plugins, but we also rely on registration order between two
+        // `pre`-stage plugins. Asserting the array order here protects
+        // against regressions where the user plugin loses its slot.
+        expect(userIdx).toBeLessThan(tsconfigIdx);
+      } finally {
+        await server.close();
+      }
+    });
+
+    it("still boots when the user project has no tsconfig at all", async () => {
+      const projectRoot = makeProjectRoot();
+      const server = await createViteComponentServer(projectRoot);
+      try {
+        // No tsconfig, so vite-tsconfig-paths is not registered. The
+        // server should still expose `fs.allow` containing projectRoot.
+        expect(server.config.server.fs.allow).toEqual(expect.arrayContaining([projectRoot]));
+      } finally {
+        await server.close();
+      }
+    });
+
+    it("does not crash on a malformed tsconfig — logs a warning and falls back to no aliases", async () => {
+      const projectRoot = makeProjectRoot();
+      writeFile(join(projectRoot, "tsconfig.json"), "{ broken json");
+
+      const stderr = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+      try {
+        const server = await createViteComponentServer(projectRoot);
+        try {
+          // Server still up — the AC says malformed tsconfig must NOT
+          // crash the dev server.
+          expect(server.config.server.fs.allow).toEqual(expect.arrayContaining([projectRoot]));
+        } finally {
+          await server.close();
+        }
+      } finally {
+        stderr.mockRestore();
+      }
+    });
   });
 });

@@ -1,0 +1,4 @@
+/* Minimal style entry so Deloop's auto-detect succeeds without a no-CSS warning. */
+:root {
+  color-scheme: light dark;
+}

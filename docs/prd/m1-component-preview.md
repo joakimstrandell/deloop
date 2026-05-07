@@ -95,7 +95,7 @@ The selected component for Components mode is persisted in `canvas.json` — swi
 ## Open questions
 
 - **Grid axis defaults.** Variant on rows, state on columns? Or the inverse? Probably configurable, but V1 needs one default.
-- **Components with no variants.** A Button with no `variant` union is just one Card per pseudo-state. A component with no union props *and* default pseudo-state only is one Card. The mode should still be useful — how does the empty-variant case render?
+- **Components with no variants.** A Button with no `variant` union is just one Card per pseudo-state. A component with no union props _and_ default pseudo-state only is one Card. The mode should still be useful — how does the empty-variant case render?
 - **Multiple union props.** A component with `variant` × `size` × `tone` has 3 axes, not 2. V1 grid is 2D — picks the two axes with the most distinct values? Or the user picks which two? Probably the latter.
 - **Relationship to AWK-16 follow-up.** The Components mode controls today live above the Screens inspector design. If AWK-16's follow-up makes the props panel selectable per-instance (nested-prop-editing), Components mode and Screens mode share that panel architecture. Decide before either ships in detail.
 
