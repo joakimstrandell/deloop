@@ -57,6 +57,40 @@ Tests that observe real OS-level events — filesystem watchers (chokidar), proc
 
 When a test passes locally but fails in CI with a timing-sensitive symptom, treat the test instrumentation as broken, not the implementation under test. Diagnose the race and fix it (mock the event source, or wait on a deterministic signal); do not retry or extend the timeout.
 
+## Tests Are Bug Detectors, Not Bug Workarounds
+
+When a test reveals a bug — even a bug the test was not written to catch — fix the bug in product code. Do not paper over it in the test layer.
+
+A test "fix" is a workaround when:
+
+- The failing assertion observes real product behavior, and the proposed fix changes test setup, helpers, or fixtures to dodge a symptom that would still occur in production.
+- A real user, not the test harness, would see the same symptom on the same path.
+- The fix relocates the symptom in time (e.g., prewarming product code before the assertion) without removing it from the product path.
+- The change keeps tests green but leaves the underlying behavior shipping.
+
+Before scoping a fix at the test layer, answer:
+
+1. Is the failing assertion observing real product behavior?
+2. Would a real user see the same symptom?
+3. Does the proposed fix change product behavior, or only the test's exposure to it?
+
+If (1) and (2) are yes and (3) is "only the test's exposure", the bug is unfixed. Reframe scope to fix the product.
+
+Acceptable test-layer changes:
+
+- Removing real-OS-event nondeterminism (mocks for chokidar, real timers, real network) per "Test Determinism" above.
+- Waiting on deterministic signals instead of timing-based ones.
+- Replacing brittle selectors with stable ones.
+- Repairing test setup that was wrong from the start.
+
+Forbidden test-layer changes:
+
+- Prewarming, pre-loading, or pre-evaluating product code to dodge a runtime side effect (reload, reflow, race) that real users would hit.
+- Extending timeouts, raising retries, or marking flaky to mask a real defect.
+- Adding helpers that compensate for a product bug rather than testing around it.
+
+When a test surfaces a bug outside its original scope, file a follow-up Linear issue and fix the bug. Do not absorb the workaround into the test suite. When the product fix lands, any prior test-layer mitigation gets removed in the same PR (or a follow-up linked from it) — keeping the workaround alongside the fix is itself a violation.
+
 ## Definition of Done (Required Checks)
 
 Before marking an issue Done:

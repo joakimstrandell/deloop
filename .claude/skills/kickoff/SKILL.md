@@ -39,6 +39,17 @@ Walk the decision tree, one question at a time, recommended answer for each. Dri
 
 Update Linear with refinements (tightened AC, decomposed scope, notes). Split the issue if it grew substantially.
 
+### Test-layer fix-shape check (mandatory)
+
+When a candidate fix lives in test code (helpers, fixtures, setup, retries, prewarms), explicitly answer before locking scope:
+
+1. Would the failing symptom appear if a real user took the same action?
+2. Does the candidate fix change product behavior, or only the test's exposure to it?
+
+If (1) is yes and (2) is "only test exposure", the candidate is a workaround, not a fix. Reframe scope (or split a follow-up issue) to fix the product. Test-layer mitigations are acceptable only when the underlying defect is also being fixed in product code — in the same PR, or in a follow-up issue filed before merge with a clear removal plan.
+
+See `AGENTS.md` Core Invariants ("Tests don't paper over bugs") and `docs/agent/testing.md` "Tests Are Bug Detectors, Not Bug Workarounds" for the full rule.
+
 ## Phase 3a — Decision gate + handoff (Session A only — terminal phase for Session A)
 
 Confirm with the CEO before writing the handoff:
