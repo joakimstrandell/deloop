@@ -10,14 +10,14 @@ Product requirement documents for Deloop. Each PRD describes _what_ and _why_ fo
 
 ## Active
 
-| File                                                       | Status            | Scope                                                                |
-| ---------------------------------------------------------- | ----------------- | -------------------------------------------------------------------- |
-| [foundation.md](foundation.md)                             | Active            | Vision, positioning, mode taxonomy, language.                        |
-| [m0-spatial-canvas.md](m0-spatial-canvas.md)               | Active (in flight) | Discovery, canvas, drag-drop, pseudo-states, Pages, HMR, persistence. |
-| [m1-component-preview.md](m1-component-preview.md)         | Draft             | Mode-switcher chassis + per-component variant/state grid.            |
-| [m2-screens.md](m2-screens.md)                             | Draft             | Design-in-code mode with Tailwind-first inspector and write-back.    |
-| [m3-tokens-and-themes.md](m3-tokens-and-themes.md)         | Draft             | DTCG tokens, live editing, themes, build outputs.                    |
-| [app-views.md](app-views.md)                               | Unscheduled       | Embedded running apps with token / theme injection.                  |
+| File                                               | Status             | Scope                                                                 |
+| -------------------------------------------------- | ------------------ | --------------------------------------------------------------------- |
+| [foundation.md](foundation.md)                     | Active             | Vision, positioning, mode taxonomy, language.                         |
+| [m0-spatial-canvas.md](m0-spatial-canvas.md)       | Active (in flight) | Discovery, canvas, drag-drop, pseudo-states, Pages, HMR, persistence. |
+| [m1-component-preview.md](m1-component-preview.md) | Draft              | Mode-switcher chassis + per-component variant/state grid.             |
+| [m2-screens.md](m2-screens.md)                     | Draft              | Design-in-code mode with Tailwind-first inspector and write-back.     |
+| [m3-tokens-and-themes.md](m3-tokens-and-themes.md) | Draft              | DTCG tokens, live editing, themes, build outputs.                     |
+| [app-views.md](app-views.md)                       | Unscheduled        | Embedded running apps with token / theme injection.                   |
 
 ## Conventions
 

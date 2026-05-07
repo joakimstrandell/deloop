@@ -45,7 +45,7 @@ App Views embed the user's own running applications inside Deloop and apply the 
 export default {
   apps: [
     { name: "Marketing site", url: "http://localhost:3000" },
-    { name: "Dashboard",      url: "http://localhost:3001" },
+    { name: "Dashboard", url: "http://localhost:3001" },
   ],
 };
 ```
