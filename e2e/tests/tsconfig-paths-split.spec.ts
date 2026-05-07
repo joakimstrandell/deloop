@@ -14,8 +14,14 @@
  * `playwright.config.ts`. Spec files matching `tsconfig-paths-*.spec.ts`
  * run only against that project.
  */
-import { test, expect } from "@playwright/test";
+import { test, expect, type Page } from "@playwright/test";
 import { dropComponentOnCanvas } from "./helpers/canvas-drop.js";
+
+async function getIframeNavigationCount(page: Page): Promise<number> {
+  const frame = page.frame({ url: /iframe\.html/ });
+  if (!frame) throw new Error("Canvas iframe not loaded");
+  return frame.evaluate(() => performance.getEntriesByType("navigation").length);
+}
 
 test.describe("tsconfig.app.json path-alias propagation", () => {
   test("a component importing @/lib/utils mounts in the canvas", async ({ page }) => {
@@ -40,6 +46,17 @@ test.describe("tsconfig.app.json path-alias propagation", () => {
     await expect(page.getByRole("button", { name: "Example", exact: true })).toBeVisible({
       timeout: 10_000,
     });
+
+    // AWK-91: capture iframe navigation count before the drop. With the
+    // path-aliased import (`@/lib/utils`) reachable through the fixture
+    // shim, the optimizer must walk the alias-resolved module graph at
+    // server boot too. If it doesn't, the first drop here triggers a
+    // depOptimize-driven full reload of the iframe, the navigation count
+    // bumps, and this assertion fails — proving the AWK-75 + AWK-91
+    // interaction is correct end-to-end.
+    const initialNavCount = await getIframeNavigationCount(page);
+    expect(initialNavCount).toBe(1);
+
     await dropComponentOnCanvas(page, "Example", 150, 200);
 
     const canvas = page.frameLocator("iframe#canvas");
@@ -48,6 +65,11 @@ test.describe("tsconfig.app.json path-alias propagation", () => {
     await expect(canvas.getByText(/Example: alias-resolved/)).toBeVisible({
       timeout: 10_000,
     });
+
+    // AWK-91: iframe must not have navigated again. A Vite full-reload
+    // would bump `getEntriesByType("navigation").length` to 2.
+    const postDropNavCount = await getIframeNavigationCount(page);
+    expect(postDropNavCount).toBe(1);
 
     // No JS errors during the alias-resolved mount.
     expect(consoleErrors).toEqual([]);
