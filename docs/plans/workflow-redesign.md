@@ -1,6 +1,6 @@
 # Workflow Redesign Plan: Compose Lifecycle from Skills
 
-**Status:** Draft, awaiting grill.
+**Status:** Draft, mid-grill.
 **Author:** Orchestrator (with conservative + greenfield agent inputs and user direction).
 **Scope:** This plan describes HOW the project's workflow will be restructured. It does not implement any changes. Implementation gates on grill + user sign-off.
 
@@ -19,109 +19,101 @@ Restructure the workflow so that:
 
 ## 2. Principles
 
-- **Skill = primitive. Workflow = composition.** Skills don't know which workflow they're part of. The workflow knows which skills it uses.
+- **Skill = primitive. Workflow = composition.** Skills don't know which workflow they're part of.
 - **Project specifics don't leak into skills.** Skills reference `AGENTS.md` for tracker, branch conventions, validation commands, label vocabulary, commit format.
-- **Role names are conceptual and portable.** Curator and Orchestrator describe function, not project identity — they live directly in skill bodies.
+- **Role names are conceptual and portable.** Curator, Orchestrator, Implementer, Reviewer, user describe function — they live directly in skill bodies, no indirection.
 - **One workflow doc, not many.** `docs/workflow.md` is the entry point. `docs/agent/*.md` files are focused playbooks (testing, code-review, decision-records).
-- **Plans are first-class, checked-in artifacts.** All plans live in `docs/plans/`, regardless of scope. Issue-level plans (Implementer spawn prompts) and initiative-level plans (cross-cutting design like this one) share one location and one vocabulary.
+- **Plans are first-class, checked-in artifacts.** All plans live in `docs/plans/`. Issue-level plans (Implementer spawn prompts) and initiative-level plans (cross-cutting design like this one) share one location and one vocabulary.
+- **No mid-work `/clear`.** Both roles `/clear` at natural boundaries only.
 
 ---
 
 ## 3. Roles
 
-Two orchestration roles + supporting subagents + the human:
-
 - **user** — the human. Sets direction, picks issues, owns final merge in manual mode.
-- **Curator** — strategic role. Owns ideation, `/to-prd`, `/to-issues`, `/triage`, PRD-level grilling. Long-running across many issues; rarely `/clear`s.
-- **Orchestrator** — tactical role. Owns `/kickoff`, `/co-review`, `/resume`, `/arch-review`. Per-issue cycles; cold-respawned often.
+- **Curator** — strategic role. Owns ideation, `/to-prd`, `/to-issues`, PRD-level `/grill-with-docs`, and standalone `/triage` for occasional backlog grooming (rare). Sessions are typically PRD-shaped: spin up to shape a PRD, stay warm during decomposition, end after `/to-issues` publishes.
+- **Orchestrator** — tactical role. Owns `/kickoff` (triage as Phase 1 + design grill as Phase 2), `/co-review`, `/resume-orchestrator`, `/arch-review`. Per-issue cycles; cold-respawned often.
 - **Implementer** — subagent spawned by Orchestrator for a single issue. Worktree-isolated. Disposed after issue ships.
 - **Reviewer** — subagent spawned by Orchestrator to review the PR. Same worktree as the Implementer. Disposed after issue ships.
 
-The Curator/Orchestrator boundary is at `ready-for-agent`: Curator owns issues up to that label; Orchestrator owns everything from `/kickoff` onward. `/arch-review` produces output (candidate refactor issues) that crosses back to Curator via `/triage`.
+**Role boundary:** Curator's responsibility ends at issue creation (whether single-issue intake or `/to-issues` decomposition from a PRD). Orchestrator owns everything from `/kickoff` onward, including pre-flight triage (workable / needs-info / wontfix) and just-in-time design grilling.
 
-(Replaces the prior single CPTO role. Rationale in §11.)
+**Two parallel Claude Code instances**: one runs Curator, one runs Orchestrator. They share no context; the tracker (Linear) and `docs/` are the bridge. Role is established implicitly by the first skill invocation in a session — no upfront "you are the Curator" declaration needed.
 
 ---
 
 ## 4. Target lifecycle
 
 ```
-[ Stage 0 — Idea ]
-  Trigger:    user surfaces a thought, bug report, or strategic direction
-  Skill:      (none yet)
-  Actor:      user + Curator
-  Artifact:   either a Linear issue (single-scope) or kicks off Stage 1 (PRD-scope)
+[ Stage 0 — Issue intake ]
+  Trigger:    user files a bug/ask, OR describes one in a Curator session
+  Skill:      direct tracker filing (no skill) OR Curator+tracker MCP
+  Actor:      user (Path A) or Curator on user's behalf (Path B)
+  Artifact:   tracker issue with body = What + AC + Blocked-by (no implementation design)
 
 [ Stage 1 — PRD (multi-issue scope only) ]
   Trigger:    Initiative spans >3 issues OR introduces user-facing concept OR cross-cutting impact
-  Skill:      /to-prd → /grill-with-docs
+  Skill:      /to-prd → /grill-with-docs (PRD-level)
   Actor:      Curator + user collaborative
-  Artifact:   docs/prd/<slug>.md (status: Draft); mN- prefix when milestone-assigned
+  Artifact:   docs/prd/<slug>.md (Draft); mN- prefix when milestone-assigned
               ADRs filed inline if decisions cross the bar
 
 [ Stage 2 — Decompose ]
   Trigger:    PRD reaches "Active" with locked milestone
   Skill:      /to-issues (vertical slices, AFK/HITL marked)
   Actor:      Curator; user approves slice list before publish
-  Artifact:   N Linear issues, each labeled `needs-triage`,
-              body = What + AC + Blocked-by (NO design)
+  Artifact:   N tracker issues, body = What + AC + Blocked-by
 
-[ Stage 3 — Triage ]
-  Trigger:    Linear issue has `needs-triage` label
-  Skill:      /triage (calls /diagnose for bugs; /grill-with-docs for fuzzy AC)
-  Actor:      Curator
-  Output:     `ready-for-agent` | `ready-for-human` | `needs-info` | `wontfix`
-  Artifact:   Triage decision as Linear comment (with AI-generated disclaimer)
-              `wontfix` enhancements: .out-of-scope/<slug>.md
-              `ready-for-agent`: AC sharpened, scope bounded — NO implementation design
+[ Stage 3 — Wait ]
+  Issue sits in backlog. Hours, days, weeks, months — staleness defense lives downstream.
 
-[ Stage 4 — Wait ]
-  Issue sits in backlog. Hours, days, weeks, months — staleness defense lives here.
-
-[ Stage 5 — Kickoff (Session A: warm) ]
-  Trigger:    user types `/kickoff <ID> [autonomous]` against a `ready-for-agent` issue
-  Skill:      /kickoff Phase 1-3a
-              Phase 2 grill = /grill-with-docs in DELTA MODE against triage-locked AC.
-              Resolves only what's drifted: codebase changes, new ADRs, scope still valid.
+[ Stage 4 — Kickoff (Session A: warm) ]
+  Trigger:    user types `/kickoff <ID> [autonomous]`
+  Skill:      /kickoff
+              Phase 1 = triage (invokes /triage skill, /diagnose for hard-repro bugs)
+                        decides: workable | needs-info | wontfix
+                        on wontfix: write .out-of-scope/<slug>.md, close, stop
+                        on needs-info: comment on issue, stop
+              Phase 2 = /grill-with-docs in DELTA MODE against current main
+                        produces locked implementation decisions
+              Phase 3a = decision gate, write plan file
   Actor:      Orchestrator
   Artifact:   docs/plans/<issue-id>.md (checked in) — Implementer spawn prompt
-              Linear issue updated with any deltas surfaced
+              Linear updated with deltas
 
-[ Stage 6 — /clear + Spawn (Session B: cold) ]
+[ Stage 5 — /clear + Spawn (Session B: cold) ]
   Trigger:    user retypes `/kickoff <ID>`; cold Orchestrator detects the plan file
-  Skill:      /kickoff Phase 4
+  Skill:      /kickoff Phase 4 (spawn)
   Actor:      Implementer subagent in worktree;
               uses /test-driven-development for new logic modules
   Artifact:   PR with structured description per docs/agent/code-review.md
 
-[ Stage 7 — Review ]
+[ Stage 6 — Review ]
   Trigger:    Implementer reports PR URL
   Skill:      /co-review (cycles 1-2, arbitrate, merge step)
   Actor:      Reviewer subagent + Orchestrator arbitration
   Artifact:   PR with `Orchestrator arbitration:` comments;
               (autonomous) `Mode: autonomous` trace
 
-[ Stage 8 — Merge ]
+[ Stage 7 — Merge ]
   Trigger:    Review converged + CI green
   Skill:      /co-review Phase 4
   Actor:      Orchestrator (autonomous) or user (manual)
-  Artifact:   merge commit; Linear → Done
+  Artifact:   merge commit; tracker → Done
 
-[ Stage 9 — Reflect-and-clear ]
+[ Stage 8 — Reflect-and-clear ]
   Trigger:    Post-merge
   Skill:      /co-review Phase 5
   Actor:      Orchestrator
-  Artifact:   playbook PR (if codifiable); Linear comment (if project-state).
-              Increment arch-review counter. docs/plans/<issue-id>.md retained as record.
+  Artifact:   playbook PR (if codifiable); tracker comment (if project-state)
+              docs/plans/<issue-id>.md retained as historical record
 
-[ Stage 10 — Recurring arch review ]
-  Trigger:    Cron (weekly) | N-merges-since-last (default: 10)
-              | cycle-2 frequency signal | user-invoked
+[ Stage 9 — Recurring arch review ]
+  Trigger:    Cron (weekly) | user-invoked
   Skill:      /arch-review wraps /improve-codebase-architecture
   Actor:      Orchestrator; user supervises (no autonomous arch reviews)
-  Artifact:   Each accepted candidate → Linear issue with `arch-review` + `needs-triage`
-              (re-enters Stage 3 under Curator).
-              Multi-issue refactors → docs/prd/<slug>.md.
+  Artifact:   Each accepted candidate → tracker issue (Stage 0 entry).
+              Multi-issue refactors → Curator decomposes via /to-prd.
 ```
 
 ---
@@ -132,16 +124,17 @@ The Curator/Orchestrator boundary is at `ready-for-agent`: Curator owns issues u
 |---|---|---|---|---|
 | `to-prd` | global | Copy + genericize | Curator | Already mostly generic |
 | `to-issues` | global | Copy + genericize | Curator | Already mostly generic |
-| `triage` | global | Copy + parameterize labels | Curator | Triage label vocab in `AGENTS.md` |
+| `triage` | global | Copy + parameterize | Orchestrator (primary, inside `/kickoff` Phase 1); Curator (secondary, standalone for backlog grooming) | Label vocab in `AGENTS.md` |
 | `grill-with-docs` | global | Copy as-is | Curator + Orchestrator | Already generic |
 | `grill-me` | global | **Discard** | — | Strict subset of grill-with-docs |
-| `diagnose` | global | Copy as-is | Curator (in triage) + Implementer | Already generic |
+| `diagnose` | global | Copy as-is | Orchestrator (in `/kickoff` Phase 1 for hard-repro bugs) + Implementer (during fix loop) | Already generic |
 | `test-driven-development` | global | Copy as-is | Implementer | Keep full name |
 | `improve-codebase-architecture` | global | Copy as-is | (wrapped by `arch-review`) | Already generic |
-| `arch-review` | NEW | Create | Orchestrator | Thin cron/counter wrapper |
-| `kickoff` | local | Refactor + genericize | Orchestrator | Apply §6 rules |
-| `co-review` | local | Refactor + genericize | Orchestrator | Apply §6 rules |
-| `resume` | local | Refactor + genericize | Curator + Orchestrator | See §12.3 (single skill or split) |
+| `arch-review` | NEW | Create (thin cron wrapper) | Orchestrator | Cron-only trigger; no counter |
+| `kickoff` | local | Refactor | Orchestrator | Phase 1 absorbs triage + diagnose dispatch |
+| `co-review` | local | Refactor | Orchestrator | Apply §6 rules |
+| `resume-curator` | NEW (split from local `resume`) | Create | Curator | Recovers in-flight PRDs / triage state |
+| `resume-orchestrator` | NEW (split from local `resume`) | Create | Orchestrator | Recovers in-flight kickoffs / reviews / merges |
 
 ---
 
@@ -151,15 +144,15 @@ For any skill in `.claude/skills/`:
 
 | Project-specific term | Generic replacement | Source of truth |
 |---|---|---|
-| `Linear` / `GitHub Issues` / `Jira` | "the issue tracker" | `AGENTS.md` § Skill bindings |
+| `Linear` / `GitHub Issues` / `Jira` | "the tracker" | `AGENTS.md` § Skill bindings |
 | `AWK-XX` | `<issue-id>` | `AGENTS.md` § Skill bindings |
 | `pnpm check` / `pnpm test` | "the project's check command" | `AGENTS.md` § Skill bindings |
 | `main` | "the default branch" | `AGENTS.md` § Skill bindings |
 | `<type>/awk-<n>-<topic>` | "the project's branch naming convention" | `AGENTS.md` § Skill bindings |
-| `needs-triage`, `ready-for-agent`, etc. | "the triage label vocabulary" | `AGENTS.md` § Skill bindings |
+| Triage label vocabulary (whatever survives — see §12.1) | "the triage label vocabulary" | `AGENTS.md` § Skill bindings |
 | Conventional Commits format | "the project's commit format" | `AGENTS.md` § Skill bindings |
 
-**Roles (Curator, Orchestrator, Implementer, Reviewer, user) are NOT genericized** — they are the workflow's role names per §3, used directly in skill bodies. They are conceptual, not project-specific. Other projects adopting these skills adopt these role names too (or fork the skills).
+**Roles (Curator, Orchestrator, Implementer, Reviewer, user) are NOT genericized** — they are the workflow's role names per §3, used directly in skill bodies.
 
 ---
 
@@ -169,19 +162,56 @@ All plans live in `docs/plans/`, checked in. No `.claude/plans/`, no `.claude/ha
 
 | Plan type | Example path | Lifetime |
 |---|---|---|
-| Issue-level (Implementer spawn prompt) | `docs/plans/awk-42.md` | Created at `/kickoff`, used post-`/clear`, retained after merge |
+| Issue-level (Implementer spawn prompt) | `docs/plans/awk-42.md` | Created at `/kickoff` Phase 3a; retained after merge |
 | Initiative-level (cross-cutting design) | `docs/plans/workflow-redesign.md` | Indefinite |
 
 Why converge:
 - Issue-level plans survive `/clear`, machine swap, and crash — fixes gitignored-handoff fragility.
 - Plans become part of the PR audit trail.
 - Grillable without `.gitignore` friction.
-- Matches "everything we use lives in the repo."
 - One vocabulary, one location.
 
-Lifecycle for issue-level plans: created at `/kickoff` Phase 3a (post-grill, pre-spawn). Read by cold Orchestrator at `/kickoff` Phase 4 to spawn Implementer. Retained after merge (cheap; deletion is optional cleanup, not part of the workflow).
+**Issue-level plan template** (slim — references, not pastes):
 
-`.gitignore`: remove the `.claude/handoffs/` entry. Migrate any existing handoff files into `docs/plans/` during Phase 5.
+```markdown
+---
+issue: <issue-id>
+branch: <branch-name>
+mode: manual | autonomous
+created_at: <iso-timestamp>
+base_sha: <main HEAD at handoff>
+---
+
+# Plan — <issue-id>
+
+## Source
+- Issue: <tracker URL>
+- PRD (if applicable): docs/prd/<path>
+
+## Locked scope decisions (from kickoff grill)
+<the unique content — locked AC refinements, architecture choices,
+out-of-scope items, dependency decisions>
+
+## Required reading
+- AGENTS.md § Roles, § Core Invariants, § Skill bindings
+- docs/agent/testing.md, docs/agent/code-review.md
+- ADRs: <relevant ADR paths, one-line per>
+
+## Branch
+<branch-name>
+
+## Required local validation
+- <project's check command> passes.
+- <project's test command> passes.
+- Commits in <project's commit format>.
+
+## Done criteria
+<bullet list — AC-aligned>
+```
+
+Target length: ≤100 lines per issue plan. The Linear issue body and AGENTS.md are NOT pasted — Implementer reads them via tools.
+
+`.gitignore`: remove `.claude/handoffs/`. Migrate any existing handoff files into `docs/plans/` during Phase 5.
 
 ---
 
@@ -192,42 +222,35 @@ Becomes a tight role + bindings + invariants doc. Lifecycle prose moves to `docs
 Sections:
 
 1. **Project intro** (1 paragraph).
-2. **Roles** — the role names from §3 of this plan, with project-specific responsibility scoping.
+2. **Roles** — the role names from §3 of this plan with project-specific responsibility scoping.
 3. **Core invariants** — current section, mostly intact (canvas iframe rules, etc.).
-4. **Skill bindings** (NEW) — the lookup table:
+4. **Skill bindings** (NEW):
    ```markdown
    ## Skill bindings
 
-   - **Issue tracker:** Linear (via Linear MCP)
+   - **Tracker:** Linear (via Linear MCP)
    - **Issue ID format:** AWK-<n>
    - **Default branch:** main
    - **Branch naming:** <type>/awk-<n>-<topic>
    - **Validation commands:** `pnpm check`, `pnpm test`
    - **Commit format:** Conventional Commits with `(AWK-XX)` suffix
-   - **Triage labels:** `needs-triage`, `ready-for-agent`, `ready-for-human`, `needs-info`, `wontfix`
+   - **Triage label vocabulary:** <see §12.1 — what survives>
    ```
 5. **Documentation map** — pointer to `docs/workflow.md`, `docs/prd/`, `docs/plans/`, etc.
 
-Cuts (move to `docs/workflow.md`):
-- Default Flow
-- Linear Status Lifecycle
-- Plans Policy
-- Branch and PR Naming details (referenced from § Skill bindings)
+Cuts (move to `docs/workflow.md`): Default Flow, Linear Status Lifecycle, Plans Policy, Branch and PR Naming details (referenced from § Skill bindings).
 
 ---
 
-## 9. `docs/workflow.md` (new top-level composition doc)
+## 9. `docs/workflow.md`
 
-Project-agnostic. Project specifics referenced from `AGENTS.md`.
-
-Structure (sketched):
+Project-agnostic. Project specifics referenced from `AGENTS.md`. Structure (sketched):
 
 ```markdown
 # Workflow
 
 How work flows through this project, end to end. Each stage names the
-skill that drives it. Project-specific terms (issue tracker, branch
-naming, role responsibilities) are defined in AGENTS.md.
+skill that drives it. Project-specific terms are defined in AGENTS.md.
 
 ## Roles
 [brief — points to AGENTS.md § Roles]
@@ -235,108 +258,106 @@ naming, role responsibilities) are defined in AGENTS.md.
 ## Lifecycle overview
 [the diagram from §4 of the redesign plan]
 
-## Stage 0 — Idea
-[short prose: trigger, actor, artifact]
+## Stage 0 — Issue intake
 ... (one section per stage)
 
 ## Modes (manual vs autonomous)
-[per-issue verbal opt-in, circuit breakers]
 
 ## Plans
 - All plans live in docs/plans/, checked in.
 - Issue-level plans created at /kickoff; retained after merge.
-- Initiative-level plans for cross-cutting design (rare).
 
 ## Recovery
-[references /resume]
+[references /resume-curator, /resume-orchestrator]
 ```
 
-Length target: under 500 lines. Skills + `AGENTS.md` carry detail.
+Length target: under 500 lines.
 
 ---
 
 ## 10. Migration phases (each is a separate PR)
 
-**Phase 0 (this PR).** Plan only. No code/skill changes. Gates on grill + user sign-off.
+**Phase 0 (this PR).** Plan only. Gates on grill + user sign-off.
 
-**Phase 1.** Copy primitive skills (project-agnostic) to `.claude/skills/`:
+**Phase 1.** Copy primitive skills (project-agnostic):
 - `grill-with-docs`, `diagnose`, `test-driven-development`, `improve-codebase-architecture`.
 - Minimal/no genericization.
 
 **Phase 2.** Copy lifecycle skills with parameterization:
 - `to-prd`, `to-issues`, `triage`. Apply §6 rules.
 
-**Phase 3.** Add `arch-review` wrapper skill + `.claude/state/arch-review-counter.json` infrastructure.
+**Phase 3.** Add `arch-review` wrapper skill (cron trigger only, no counter).
 
 **Phase 4.** Refactor existing local skills + role rename. One PR per skill (3 PRs):
-- `kickoff/SKILL.md` — apply §6 + rename CPTO → Orchestrator, CEO → user.
-- `co-review/SKILL.md` — same.
-- `resume/SKILL.md` — same. Resolve §12.3 (single or split).
+- `kickoff/SKILL.md` — apply §6, rename CPTO → Orchestrator, fold triage into Phase 1.
+- `co-review/SKILL.md` — apply §6, rename CPTO → Orchestrator.
+- Replace `resume/SKILL.md` with `resume-curator/SKILL.md` and `resume-orchestrator/SKILL.md`.
 
 **Phase 5.** Consolidate plans:
-- Migrate any existing `.claude/handoffs/*.md` to `docs/plans/`.
+- Migrate any existing `.claude/handoffs/*.md` → `docs/plans/`.
 - Update `.gitignore` (drop `.claude/handoffs/`).
 - Update skill references.
 
 **Phase 6.** Rewrite `AGENTS.md`. Write `docs/workflow.md`. Delete `docs/agent/workflow.md`.
 
-**Phase 7.** First arch-review dry run. Validate the recurring loop end-to-end.
-
-Each phase grillable, shippable, and live for a day before the next.
+**Phase 7.** First arch-review dry run. Validate end-to-end.
 
 ---
 
-## 11. Decisions baked in (not for grill — already locked)
+## 11. Decisions baked in (locked)
 
-These are load-bearing; settled before grill so the grill focuses on tunable details.
-
-- **Triage runs against an existing issue, never before issue creation.** Lifecycle: `/to-issues` (or direct issue) → `needs-triage` → `/triage` → `ready-for-agent` → `/kickoff`.
-- **Triage's grill is light (AC + terminology). Kickoff's grill is heavy (implementation design against current main).** Triage doesn't lock implementation because issues sit for weeks/months.
-- **Issue body holds AC; implementation design lives in the kickoff plan and PR description.** Never written back to issue body. Staleness defense.
+- **Triage runs against an existing issue, never before issue creation.**
+- **Triage's grill (now `/kickoff` Phase 1) is light. Design grill (Phase 2) is heavy.** Triage doesn't lock implementation because issues sit for weeks/months; design grill happens against current main.
+- **Issue body holds AC; implementation design lives in plan + PR description.** Never written back to issue body. Staleness defense.
 - **`grill-me` discarded** in favor of `grill-with-docs`. Wrong default for a CONTEXT-rich project.
-- **Single plans directory: `docs/plans/`, checked in.** Replaces `.claude/handoffs/`. Issue-level and initiative-level plans share one location. (See §7.)
-- **Roles renamed: CPTO → Orchestrator; CEO → user. Implementer/Reviewer unchanged.** Skill bodies use these names directly; no AGENTS.md indirection layer for roles. Existing `CPTO arbitration:` PR comments stay as historical record; new comments use `Orchestrator arbitration:`.
-- **CPTO splits into TWO roles: Curator (strategic) + Orchestrator (tactical).** Boundary at `ready-for-agent`. Three-role split (separate Architect) rejected as over-engineering — `/arch-review` is an Orchestrator entry point, not a distinct session shape.
+- **Single plans directory: `docs/plans/`, checked in.** Replaces `.claude/handoffs/`.
+- **Roles project-agnostic and used directly in skill bodies.** No AGENTS.md indirection layer for roles. CPTO → Orchestrator; CEO → user; Implementer/Reviewer unchanged.
+- **Two-role split: Curator (strategic) + Orchestrator (tactical).** Boundary at issue creation. Curator runs PRD work + decompose + occasional standalone triage. Orchestrator runs everything from `/kickoff` onward (pre-flight triage Phase 1 + design grill Phase 2).
+- **Two parallel Claude Code instances.** Curator and Orchestrator run in separate sessions. Role established implicitly by the first skill invocation; no upfront declaration.
+- **`/resume` splits into `/resume-curator` and `/resume-orchestrator`.** Each recovers its role's state.
+- **Both roles `/clear` at natural boundaries; no mid-work `/clear`.** If 150k threshold approaches mid-work, handle it then — don't pre-bake escape behavior.
+- **`/arch-review` trigger: cron + user-invoked only.** No counter, no cycle-2 detection automation. `.claude/state/` not created.
+- **Issue-level plan template is slim.** References (`Required reading`) instead of pastes. Locked decisions are the unique content.
+- **Triage stage as a separate lifecycle step is dropped.** `/triage` survives as a callable skill; primary use is inside `/kickoff` Phase 1, secondary is standalone Curator backlog grooming.
 
 ---
 
-## 12. Open questions (for the grill)
+## 12. Open questions (for grill)
 
 Defaults in italics.
 
-1. **Refactor budget — soft (track-only) or hard (next milestone blocks if unmet)?** *Default: soft. Revisit after 3 milestones.*
-2. **Arch-review N-merges threshold?** *Default: 10.*
-3. **`/resume` — single skill with role-detection, or split into `/resume-curator` and `/resume-orchestrator`?** *Default: single skill, infers role from in-flight state. Splitting means two cold-start entry points; one is simpler.*
-4. **Issue-level plans (`docs/plans/<id>.md`) — retain forever post-merge, or prune as cleanup?** *Default: retain. Disk is cheap; post-mortem value is real.*
-5. **`.out-of-scope/` directory — at repo root or under `docs/`?** *Default: repo root, per global `triage` skill convention.*
-6. **`arch-review` Linear label — does it exist?** *Default: create as part of Phase 3.*
-7. **Phase 4 (refactor existing skills) — single PR or three?** *Default: three, one per skill.*
-8. **Curator session lifecycle — when does Curator `/clear`?** *Default: rarely; Curator stays warm across many triages and PRD shapings. Orchestrator `/clear`s after each merge per current Reflect-and-clear discipline.*
-9. **Linear cycles — used as project sprints/iterations or ignored?** *Default: ignore for now; milestones are the unit of grouping. Revisit if cadence pressure builds.*
-10. **Plans index — does `docs/plans/` get a `README.md` index (mirroring `docs/prd/README.md`)?** *Default: yes, listing active initiative-level plans only (issue-level plans are too numerous to index).*
-11. **Initiating Curator vs Orchestrator session — by user choice, or by entry-point skill?** *Default: by skill. Typing `/triage` or `/to-prd` puts you in Curator mode; `/kickoff` puts you in Orchestrator mode. The session "becomes" the role on first skill invocation.*
+1. **Triage label vocabulary — what survives?** Now that triage isn't a separate stage, the labels (`needs-triage`, `ready-for-agent`, etc.) may be unnecessary. *Default: drop them entirely; rely on Linear states + Linear-native dependency/blocking. `.out-of-scope/` still populates on wontfix.*
+2. **`/diagnose` placement crispness.** Plan §4 says it fires inside `/kickoff` Phase 1 for hard-repro bugs and inside Implementer for fix loops. *Default: yes, those two places only. Curator never invokes `/diagnose` (deferred to Orchestrator's pre-flight).*
+3. **Curator session lifecycle — ephemeral (per-PRD) or persistent?** *Default: ephemeral. Each PRD spins up a Curator session, ends after `/to-issues`. Standalone backlog grooming is a separate brief invocation.*
+4. **Refactor budget — soft (track-only) or hard (next milestone blocks if unmet)?** *Default: soft. Revisit after 3 milestones.*
+5. **Issue-level plans — retain forever post-merge, or prune as cleanup?** *Default: retain.*
+6. **`.out-of-scope/` directory — at repo root or under `docs/`?** *Default: repo root, per global `triage` skill convention.*
+7. **`arch-review` tracker label — does it exist?** *Default: yes, create as part of Phase 3.*
+8. **Phase 4 (refactor existing skills) — single PR or three?** *Default: three.*
+9. **Linear cycles — used as project sprints/iterations or ignored?** *Default: ignore for now; milestones are the unit of grouping.*
+10. **Plans index — does `docs/plans/` get a `README.md`?** *Default: yes, listing active initiative-level plans only.*
 
 ---
 
 ## 13. Risks
 
-1. **Skill drift between local copies and global originals.** Mitigation: document `last-synced-commit` of the global skill in a comment at the top of each local copy; periodic diff.
-2. **Genericization may sand off useful sharpness.** Mitigation: skills reference `AGENTS.md` by concrete section heading so the indirection is one hop.
+1. **Skill drift between local copies and global originals.** Mitigation: document `last-synced-commit` in a comment at the top of each local copy.
+2. **Genericization may sand off useful sharpness.** Mitigation: skills reference `AGENTS.md` by concrete section heading.
 3. **Migration touches files used daily.** Phased PRs, dogfood between each.
-4. **Curator/Orchestrator boundary requires discipline.** If Orchestrator starts triaging mid-kickoff, the boundary erodes. Mitigation: `/kickoff` aborts if issue is not `ready-for-agent`.
-5. **`arch-review` counter is fragile** (gitignored state file). Cron is the backstop.
-6. **Plans dir clutter over time.** If we retain plans forever, `docs/plans/` grows unboundedly. Mitigation accepted; revisit after one milestone if it becomes an issue.
-7. **Existing PR comments use `CPTO arbitration:` prefix.** New comments use `Orchestrator arbitration:`. Mild inconsistency for historical record; not load-bearing.
-8. **Two roles in one user's head.** The user (the human) has to mentally context-switch between Curator and Orchestrator sessions. Mitigation: skill entry points implicitly select the role; the user never has to type "I am now Curator."
+4. **Curator/Orchestrator boundary requires discipline.** Mitigation: `/kickoff` Phase 1 enforces — if issue is missing, malformed, or scope is unclear, Phase 1 routes to wontfix/needs-info, not implementation.
+5. **Plans dir clutter over time.** Accept; revisit after one milestone if it becomes painful.
+6. **Existing PR comments use `CPTO arbitration:`.** New comments use `Orchestrator arbitration:`. Mild historical inconsistency; not load-bearing.
+7. **Two-window operational overhead.** User keeps two Claude Code instances. Heavier than single-CPTO; payoff is independent context preservation.
 
 ---
 
 ## 14. Out of scope
 
-- Hard refactor budget enforcement (deferred — see §12.1).
+- Hard refactor budget enforcement (deferred — see §12.4).
 - Migrating existing `docs/prd/` or `docs/adr/` content.
 - Multi-context (`CONTEXT-MAP.md`) support. Deloop is single-context.
-- Evolving Curator/Orchestrator into three roles (separate Architect). Defer until observed need.
+- Three-role split (separate Architect). Deferred until observed need.
+- Counter-based or quality-signal-based `/arch-review` triggers. Deferred until cron + user-invoked proves insufficient.
 
 ---
 
@@ -344,9 +365,10 @@ Defaults in italics.
 
 - All skills used live under `.claude/skills/` with project-agnostic bodies (modulo role names per §6).
 - `AGENTS.md` § Skill bindings is the single lookup for project-specific terms.
-- `docs/workflow.md` exists, ≤500 lines, references skills by name and `AGENTS.md` by section.
-- `docs/plans/` is the single plan directory (issue-level + initiative-level).
+- `docs/workflow.md` exists, ≤500 lines.
+- `docs/plans/` is the single plan directory.
 - `.claude/handoffs/` no longer exists.
 - Roles: Curator and Orchestrator named in `AGENTS.md` § Roles and used directly in skill bodies.
-- `arch-review` fires successfully at least once (cron OR counter), produces ≥1 candidate, candidate enters triage normally.
-- One full issue cycle ships post-refactor (validation: pick a small AFK issue, run cold).
+- `/resume-curator` and `/resume-orchestrator` exist as separate skills.
+- `/arch-review` fires successfully at least once via cron, produces ≥1 candidate, candidate enters tracker as a normal issue.
+- One full issue cycle ships post-refactor (validation: pick a small AFK issue, run cold, verify `/kickoff` Phase 1 triage works inline).
