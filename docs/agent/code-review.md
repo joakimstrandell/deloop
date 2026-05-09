@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Issue-aware review process for PRs. Procedural orchestration (spawning Reviewer, cycling, arbitrating, merging) lives in `/co-review` and `/kickoff` skills; this document defines what reviewers must check, what they return, and how CPTO arbitrates.
+Issue-aware review process for PRs. Procedural orchestration (spawning Reviewer, cycling, arbitrating, merging) lives in `/co-review` and `/kickoff` skills; this document defines what reviewers must check, what they return, and how Orchestrator arbitrates.
 
 ## Inputs
 
@@ -17,15 +17,15 @@ If no Linear issue is linked: verdict is `needs changes` until linkage is fixed.
 
 ## Sequence
 
-1. Implementer pushes, opens PR with structured description, all local checks + tests green, reports back to CPTO.
-2. CPTO spawns Reviewer subagent in the existing worktree (no `isolation: "worktree"` flag; pass the path explicitly).
-3. Reviewer reads diff, runs tests in worktree, checks AC against the PR description's AC mapping, drafts structured findings, returns to CPTO.
-4. CPTO arbitrates each finding (accept / reject / defer). Posts arbitrated findings as a single PR review comment.
+1. Implementer pushes, opens PR with structured description, all local checks + tests green, reports back to Orchestrator.
+2. Orchestrator spawns Reviewer subagent in the existing worktree (no `isolation: "worktree"` flag; pass the path explicitly).
+3. Reviewer reads diff, runs tests in worktree, checks AC against the PR description's AC mapping, drafts structured findings, returns to Orchestrator.
+4. Orchestrator arbitrates each finding (accept / reject / defer). Posts arbitrated findings as a single PR review comment.
 5. If accepted items exist: cold-respawn Implementer (cycle 2) with arbitrated change list. Then cold-respawn Reviewer with cycle 2 prompt focused on previously-flagged items + diff since cycle 1.
-6. Max 2 cycles. After cycle 2, CPTO arbitrates remaining items, locks scope, hands to merge step.
+6. Max 2 cycles. After cycle 2, Orchestrator arbitrates remaining items, locks scope, hands to merge step.
 7. Merge:
-   - **Manual mode**: pause for CEO co-review of worktree; CEO merges.
-   - **Autonomous mode** (CEO opted in for this issue): CPTO verifies CI green, merges.
+   - **Manual mode**: pause for user co-review of worktree; user merges.
+   - **Autonomous mode** (user opted in for this issue): Orchestrator verifies CI green, merges.
 
 ## PR Description Contract (Implementer-produced)
 
@@ -59,7 +59,7 @@ AWK-XX: <title>
 
 ## Reviewer Output Contract
 
-Returned to CPTO as structured text. Must enable arbitration without re-reading the full diff.
+Returned to Orchestrator as structured text. Must enable arbitration without re-reading the full diff.
 
 ```md
 **Verdict**: ready | needs changes
@@ -98,7 +98,7 @@ Returned to CPTO as structured text. Must enable arbitration without re-reading 
 - `should-fix`: maintainability/testability concern; resolve before merge when practical.
 - `nit`: optional style; does not block merge.
 
-## CPTO Arbitration Discipline
+## Orchestrator Arbitration Discipline
 
 Arbitration is the load-bearing step. Rubber-stamping Reviewer findings outsources the call.
 
@@ -125,6 +125,6 @@ After cycle 2, all open items are arbitrated to lock scope. No third cycle. In-s
 
 ## PR Comment Conventions
 
-- CPTO arbitration: prefix the comment `CPTO arbitration:`.
-- Autonomous-mode trace: `Mode: autonomous (CEO-authorized)` posted by CPTO after kickoff confirmation. Used by `/resume`.
-- Don't `@`-mention humans by GitHub handle unless the handle was explicitly provided. Refer by role ("Implementer", "Reviewer", "CPTO arbitration").
+- Orchestrator arbitration: prefix the comment `Orchestrator arbitration:`.
+- Autonomous-mode trace: `Mode: autonomous (user-authorized)` posted by Orchestrator after kickoff confirmation. Used by `/resume-orchestrator`.
+- Don't `@`-mention humans by GitHub handle unless the handle was explicitly provided. Refer by role ("Implementer", "Reviewer", "Orchestrator arbitration").
