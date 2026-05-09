@@ -60,7 +60,7 @@ When a candidate fix lives in test code (helpers, fixtures, setup, retries, prew
 
 If (1) is yes and (2) is "only test exposure", the candidate is a workaround, not a fix. Reframe scope (or split a follow-up issue) to fix the product. Test-layer mitigations are acceptable only when the underlying defect is also being fixed in product code — in the same PR, or in a follow-up issue filed before merge with a clear removal plan.
 
-See `AGENTS.md` Core Invariants ("Tests don't paper over bugs") and `docs/agent/testing.md` "Tests Are Bug Detectors, Not Bug Workarounds" for the full rule.
+See `AGENTS.md` Core Invariants ("Tests don't paper over bugs") and `docs/testing.md` "Tests Are Bug Detectors, Not Bug Workarounds" for the full rule.
 
 ## Phase 3a — Decision gate + plan write (Session A only — terminal phase for Session A)
 
@@ -103,7 +103,7 @@ out-of-scope items, dependency decisions>
 
 ## Required reading
 - AGENTS.md § Roles, § Core Invariants, § Skill bindings
-- docs/agent/testing.md, docs/agent/code-review.md
+- docs/testing.md, docs/code-review.md
 - ADRs: <relevant ADR paths, one-line per>
 
 ## Branch

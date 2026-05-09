@@ -10,7 +10,7 @@ Every review uses:
 
 - The linked Linear issue (`AWK-xxx`) as scope and AC source of truth.
 - `AGENTS.md` invariants.
-- `docs/agent/testing.md` required checks.
+- `docs/testing.md` required checks.
 - The full PR diff and the Implementer's structured PR description.
 
 If no Linear issue is linked: verdict is `needs changes` until linkage is fixed.

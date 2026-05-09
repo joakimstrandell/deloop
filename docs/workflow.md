@@ -61,7 +61,7 @@ Two parallel Claude Code instances run the workflow: **Curator** (strategic) and
   Actor:      Implementer subagent in worktree;
               uses /test-driven-development for new logic modules
   Artifact:   PR with structured description per
-              docs/agent/code-review.md
+              docs/code-review.md
 
 [ Stage 6 — Review ]
   Trigger:    Implementer reports PR URL
@@ -138,7 +138,7 @@ The plan is a slim references-not-pastes spawn prompt. The Implementer reads `AG
 
 ## Stage 5 — /clear + Spawn (cold session)
 
-User retypes `/kickoff <ID>`. Cold Orchestrator detects the plan file. Phase 4 spawns Implementer with the plan body verbatim. Implementer uses `/test-driven-development` for new logic modules per `docs/agent/testing.md`.
+User retypes `/kickoff <ID>`. Cold Orchestrator detects the plan file. Phase 4 spawns Implementer with the plan body verbatim. Implementer uses `/test-driven-development` for new logic modules per `docs/testing.md`.
 
 ## Stage 6 — Review
 
@@ -192,7 +192,7 @@ Trivial unblocking infra (CI config, dependency-pin updates, docs-only edits) ma
 
 Branch and commit conventions: see `AGENTS.md § Skill bindings`.
 
-PR title: `<type>(<scope>): short intent (<issue-id>)`. PR description follows the structured contract in `docs/agent/code-review.md`. PRs without a linked tracker issue are not merged.
+PR title: `<type>(<scope>): short intent (<issue-id>)`. PR description follows the structured contract in `docs/code-review.md`. PRs without a linked tracker issue are not merged.
 
 ## Tracker status lifecycle
 

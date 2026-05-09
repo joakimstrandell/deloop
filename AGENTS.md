@@ -24,7 +24,7 @@ Curator and Orchestrator run as **two parallel Claude Code instances**. They sha
 - Shell and canvas both use standard Tailwind (no prefix). Isolation comes from iframe boundary.
 - **Canvas fidelity.** The canvas iframe renders the user's component as it would render in their consuming app — same fonts, tokens, body styles, dark-mode mechanism. Deloop's chrome (card frames, labels, error UI) lives in a shadow root inside the iframe and is the only deliberate exception.
 - `packages/app` (shell/canvas) implementation baseline is Tailwind CSS v4 and React 19 conventions.
-- **Tests don't paper over bugs.** When a test reveals a defect — even one outside its original scope — fix the product, not the test. Test-layer "fixes" that dodge runtime symptoms a real user would hit are forbidden. When a product fix lands, prior test-layer mitigations get removed in the same PR (or a follow-up linked from it). Full rule: `docs/agent/testing.md` "Tests Are Bug Detectors, Not Bug Workarounds".
+- **Tests don't paper over bugs.** When a test reveals a defect — even one outside its original scope — fix the product, not the test. Test-layer "fixes" that dodge runtime symptoms a real user would hit are forbidden. When a product fix lands, prior test-layer mitigations get removed in the same PR (or a follow-up linked from it). Full rule: `docs/testing.md` "Tests Are Bug Detectors, Not Bug Workarounds".
 
 ## Skill bindings
 
@@ -63,6 +63,6 @@ Curator and Orchestrator run as **two parallel Claude Code instances**. They sha
 - `docs/prd/` — initiative PRDs (`foundation.md` vision, `mN-<slug>.md` milestone, `<slug>.md` unscheduled)
 - `docs/adr/` — architectural decisions
 - `docs/plans/` — implementation plans (issue-level + initiative-level)
-- `docs/agent/testing.md`, `code-review.md`, `decision-records.md` — focused playbooks
+- `docs/testing.md`, `docs/code-review.md`, `docs/decision-records.md` — focused playbooks
 
 Read on-demand when relevant.

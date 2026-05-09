@@ -54,4 +54,4 @@ This repo uses Husky + lint-staged:
 
 - Linear is the source of truth for feature scope and acceptance criteria.
 - Default delivery model is one issue per branch/worktree and one PR per issue.
-- See `docs/agent/workflow.md` and `docs/agent/testing.md` for full agent workflow details.
+- See `docs/workflow.md` and `docs/testing.md` for full agent workflow details.
