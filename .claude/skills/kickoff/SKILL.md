@@ -1,43 +1,55 @@
 ---
 name: kickoff
-description: CPTO entry point for starting work on a Linear issue. Grills the issue, runs the decision gate, writes a pre-spawn handoff for /clear, then spawns the Implementer and chains automatically into review. Use when starting implementation of a Linear issue (e.g. "/kickoff AWK-12", "let's start AWK-7", "kickoff this issue autonomous").
+description: Orchestrator entry point for starting work on a tracker issue. Triages, grills against current main, runs the decision gate, writes a plan for /clear, then spawns the Implementer and chains automatically into review. Use when starting implementation of an issue (e.g. "/kickoff AWK-12", "let's start AWK-7", "kickoff this issue autonomous").
 ---
 
-You are the **CPTO** (see `AGENTS.md`). This skill drives the full issue cycle: grill → handoff → /clear → spawn Implementer → review → arbitrate → cycle 2 if needed → merge step.
+You are the **Orchestrator** (see `AGENTS.md`). This skill drives the full issue cycle: triage → grill → plan write → /clear → spawn Implementer → review → arbitrate → cycle 2 if needed → merge step.
 
-The flow splits across two CPTO sessions, separated by a `/clear`:
+The flow splits across two Orchestrator sessions, separated by a `/clear`:
 
-- **Session A (warm)**: phases 0-3a. Grill the issue, run the decision gate, write handoff, advise `/clear`. Stops.
-- **Session B (cold, after /clear)**: phases 3b-6. Detect handoff, spawn Implementer, chain into review.
+- **Session A (warm)**: phases 0–3a. Triage, grill the issue against current main, run the decision gate, write the plan to `docs/plans/<issue-id>.md`, advise `/clear`. Stops.
+- **Session B (cold, after /clear)**: phases 3b–6. Detect plan, spawn Implementer, chain into review.
 
-The CEO types `/kickoff AWK-XX` in both sessions. The skill picks its phase based on whether `.claude/handoffs/<ISSUE_ID>.md` exists.
+The user types `/kickoff <ID> [autonomous]` in both sessions. The skill picks its phase based on whether `docs/plans/<issue-id>.md` exists. Tracker, branch conventions, validation commands, and label vocabulary are defined in `AGENTS.md § Skill bindings`.
 
-## Phase 0 — Handoff detection (first action on every invocation)
+## Mode + issue selection (every invocation)
 
-On entry, before doing anything else:
+Before any phase:
 
-1. Check for `.claude/handoffs/<ISSUE_ID>.md`.
-2. **Handoff present** → this is Session B (post-clear spawn). Validate freshness:
-   - Read the handoff frontmatter (`git_sha`, `created_at`).
-   - Compute current `main` HEAD SHA. Count commits between handoff `git_sha` and HEAD.
-   - **Stale check**: if `created_at` is older than 7 days, OR if there are more than 3 commits on `main` since `git_sha`, warn the CEO and ask before proceeding ("handoff is N days old / M commits behind main; proceed, regrill, or abort?").
-   - If fresh → proceed directly to phase 4 (Spawn Implementer) using the handoff content.
-3. **Handoff absent** → this is Session A (fresh kickoff). Proceed to phase 1.
+1. **Detect mode.** If the user's invocation includes "autonomous", "you have the wheel", or similar explicit phrase, this is autonomous mode. Otherwise manual. Default is manual; if ambiguous, ask.
+2. **Confirm mode once.** If autonomous: respond with one line — "Running <issue-id> autonomously. Will merge after review converges. Acknowledged." Then proceed without further per-step confirmation (subject to circuit breakers below).
+3. **Identify the issue.** If named, fetch via the tracker. If not, list relevant `Backlog`/`In Progress` issues; ask the user to pick.
 
-## Phase 1 — Mode + issue selection (Session A only)
+## Phase 0 — Plan detection (first action after issue identified)
 
-1. **Detect mode.** If the CEO's invocation includes "autonomous", "you have the wheel", or similar explicit phrase, this is autonomous mode. Otherwise manual. Default is manual; if ambiguous, ask.
-2. **Confirm mode once.** If autonomous: respond with one line — "Running AWK-X autonomously. Will merge after review converges. Acknowledged." Then proceed without further per-step confirmation (subject to circuit breakers below).
-3. **Identify the issue.** If named, fetch via Linear MCP. If not, list relevant `Backlog`/`In Progress` issues; ask CEO to pick.
+1. Check for `docs/plans/<issue-id>.md` (lowercase issue id).
+2. **Plan present** → this is Session B (post-clear spawn). Validate freshness:
+   - Read the plan frontmatter (`base_sha`, `created_at`).
+   - Compute current default-branch HEAD SHA. Count commits between `base_sha` and HEAD.
+   - **Stale check**: if `created_at` is older than 7 days, OR if there are more than 3 commits on the default branch since `base_sha`, warn the user and ask before proceeding ("plan is N days old / M commits behind default branch; proceed, regrill, or abort?").
+   - If fresh → proceed directly to Phase 3b (Pre-spawn checks).
+3. **Plan absent** → this is Session A (fresh kickoff). Proceed to Phase 1.
 
-## Phase 2 — Grill the issue (Session A only)
+## Phase 1 — Triage (Session A only)
 
-Walk the decision tree, one question at a time, recommended answer for each. Drill until AC are unambiguous and testable. Read the codebase to answer questions when possible instead of asking.
+This is the pre-flight check. Every issue passes through it; no implementation begins until triage returns `workable`.
 
-- Manual mode: grill the CEO directly.
-- Autonomous mode: spawn an Explore or Plan subagent to red-team the issue, then act on findings yourself. No CEO round-trip.
+1. Verify the issue exists in the tracker and has a body. If not, refuse to kickoff and surface the gap to the user.
+2. Invoke the `/triage` skill as a sub-procedure with the issue ID. Three branches:
+   - **workable** — AC is testable, scope bounded, repro confirmed (if bug). Proceed to Phase 2.
+   - **needs-info** — required information missing. Triage posted a comment on the issue with specific questions. **Stop.** Report back to the user that the issue is now waiting on `needs-info`.
+   - **wontfix** — out-of-scope, duplicate, or obsolete. Triage closed the issue (and wrote `.out-of-scope/<slug>.md` for enhancements). **Stop.** Report back to the user.
 
-Update Linear with refinements (tightened AC, decomposed scope, notes). Split the issue if it grew substantially.
+Do not skip triage. Do not infer outcomes from issue body alone — `/triage` reads the codebase and (for bugs) attempts repro.
+
+## Phase 2 — Design grill against current main (Session A only)
+
+Run `/grill-with-docs` in **delta mode**: walk the decision tree only for what has drifted since the issue was filed (codebase changes, new ADRs, scope still valid). Drill until AC are unambiguous and testable. Read the codebase to answer questions when possible instead of asking.
+
+- Manual mode: grill the user directly.
+- Autonomous mode: spawn an Explore or Plan subagent to red-team the issue, then act on findings yourself. No user round-trip.
+
+Lock implementation decisions (architecture choices, AC refinements, out-of-scope items, dependency decisions). These become the "Locked scope decisions" section of the plan; they are NOT written back to the issue body — staleness defense.
 
 ### Test-layer fix-shape check (mandatory)
 
@@ -50,127 +62,108 @@ If (1) is yes and (2) is "only test exposure", the candidate is a workaround, no
 
 See `AGENTS.md` Core Invariants ("Tests don't paper over bugs") and `docs/agent/testing.md` "Tests Are Bug Detectors, Not Bug Workarounds" for the full rule.
 
-## Phase 3a — Decision gate + handoff (Session A only — terminal phase for Session A)
+## Phase 3a — Decision gate + plan write (Session A only — terminal phase for Session A)
 
-Confirm with the CEO before writing the handoff:
+Confirm with the user before writing the plan:
 
-- Linear issue ID (`AWK-XX`)
+- Issue ID
 - Mode (manual / autonomous)
 - Worktree (isolated default)
 - Branch hygiene done (`git fetch --prune` + delete merged local branches)
-- Locked AC + scope decisions
+- Locked scope decisions
 
-After CEO confirms:
+After the user confirms:
 
-1. **Update Linear** with the refined AC and locked decisions baked into the issue description (or appended as a "Locked scope" section). Linear is the durable record.
-2. **Write the handoff** to `.claude/handoffs/<ISSUE_ID>.md` using the template below. The handoff is a self-contained Implementer spawn prompt that the cold CPTO will read and pass to the `Agent` tool verbatim.
-3. **Advise `/clear`**. Post a chat message: _"Linear updated. Handoff written to `.claude/handoffs/<ID>.md`. Run `/clear`, then `/kickoff <ID>` to spawn the Implementer."_
+1. **Update the tracker** with any clarifications the user wants surfaced (status notes, blocked-by links). Do NOT paste implementation design into the issue body — keep it in the plan.
+2. **Write the plan** to `docs/plans/<issue-id>.md` using the slim template below. The plan is checked in; it survives `/clear`, machine swap, and crash. References (not pastes) keep it under ~100 lines.
+3. **Advise `/clear`**. Post a chat message: _"Plan written to `docs/plans/<issue-id>.md`. Run `/clear`, then `/kickoff <ID>` to spawn the Implementer."_
 4. **Stop.** Session A ends here. Do not spawn the Implementer in Session A. Do not chain into review.
 
-### Handoff file template
+### Plan file template
 
 ```markdown
 ---
-issue: AWK-XX
-branch: <type>/awk-<n>-<topic>
+issue: <issue-id>
+branch: <branch-name>
 mode: manual | autonomous
 created_at: 2026-MM-DDTHH:MM:SSZ
-git_sha: <main HEAD sha at time of handoff>
+base_sha: <default-branch HEAD sha at time of plan write>
 ---
 
-# Implementer Spawn Prompt — AWK-XX
+# Plan — <issue-id>
 
-You are the Implementer for [AWK-XX](<linear url>). Operate in your assigned worktree.
+## Source
+- Issue: <tracker URL>
+- PRD (if applicable): docs/prd/<path>
 
-## Linear issue (full text)
+## Locked scope decisions (from kickoff grill)
 
-<paste full issue title + description + AC verbatim from Linear>
+<the unique content — locked AC refinements, architecture choices,
+out-of-scope items, dependency decisions>
 
-## Locked scope decisions (from CPTO grill)
-
-<paste the locked decisions from the decision gate — config shape, architecture choices, AC refinements, dogfood updates, out-of-scope items>
+## Required reading
+- AGENTS.md § Roles, § Core Invariants, § Skill bindings
+- docs/agent/testing.md, docs/agent/code-review.md
+- ADRs: <relevant ADR paths, one-line per>
 
 ## Branch
+<branch-name>
 
-`<type>/awk-<n>-<topic>`
-
-## Rules from AGENTS.md (paste relevant sections verbatim)
-
-<paste:
-
-- Roles section (your role: Implementer)
-- Core Invariants (every invariant relevant to this issue's surface area)
-- Orchestration Rules: "Implementer's local-validation contract", "Implementer judgment policy"
-- Contract Source of Truth (if message protocol may be touched)
-- Delivery Source of Truth: branch naming, commit format>
-
-## Playbooks (read on-demand)
-
-- `docs/agent/workflow.md` — workflow rules
-- `docs/agent/testing.md` — testing strategy
-- `docs/agent/code-review.md` — PR description contract (use the template verbatim)
-
-## Architectural context
-
-<list relevant ADRs by path; brief why-each-matters note>
-
-## Required local validation before opening PR
-
-- All `pnpm check` passes (every package).
-- All `pnpm test` passes (unit + relevant E2E).
-- Conventional Commits format with `(AWK-XX)` suffix.
+## Required local validation
+- Project's check command (per AGENTS.md § Skill bindings) passes.
+- Project's test command (per AGENTS.md § Skill bindings) passes.
+- Commits in the project's commit format (per AGENTS.md § Skill bindings).
 
 ## Done criteria
-
-- All AC met and verified locally.
-- PR opened on `<branch>`, linked to the Linear issue, with structured description per `docs/agent/code-review.md`.
-- Worktree left intact.
-- Report back with: PR URL + concise Implementer summary (what changed, AC mapping, decisions, risks).
+<bullet list — AC-aligned>
 ```
 
-## Phase 3b — Pre-spawn checks (Session B, after handoff freshness validation)
+The Implementer reads `AGENTS.md` and the tracker issue via tools when spawned — do not paste them into the plan.
+
+## Phase 3b — Pre-spawn checks (Session B, after plan freshness validation)
 
 Before spawning:
 
-1. Re-read the handoff file in full.
-2. Update Linear: status → `In Progress`. Link the (about-to-be-created) worktree path can wait until phase 4.
-3. Proceed to phase 4.
+1. Re-read the plan file in full.
+2. Update tracker: status → `In Progress`. Worktree path link can wait until Phase 4.
+3. Proceed to Phase 4.
 
 ## Phase 4 — Spawn Implementer (Session B)
 
-`Agent` tool, `isolation: "worktree"`, fresh agent. The handoff file body IS the spawn prompt — pass it verbatim. Do not re-grill.
+`Agent` tool, `isolation: "worktree"`, fresh agent. The plan body IS the spawn prompt — pass it verbatim. Do not re-grill.
 
-Record worktree path returned by the agent. Update Linear with the worktree path.
+Record worktree path returned by the agent. Update the tracker with the worktree path.
 
 ## Phase 5 — Autonomous-mode PR trace (Session B)
 
-If the handoff frontmatter says `mode: autonomous`: as soon as the Implementer reports the PR URL, post a one-line comment on the PR: `Mode: autonomous (CEO-authorized)`. This is the durable trace `/resume` uses to recover mode after a crash.
+If the plan frontmatter says `mode: autonomous`: as soon as the Implementer reports the PR URL, post a one-line comment on the PR: `Mode: autonomous (user-authorized)`. This is the durable trace `/resume-orchestrator` uses to recover mode after a crash.
 
 ## Phase 6 — Chain into review (Session B)
 
 After Implementer reports PR URL:
 
-1. Update Linear: status → `In Review`, link PR.
-2. Invoke the `/co-review` skill flow with: PR URL, worktree path, Linear issue ID, mode.
-3. After merge, delete the handoff file `.claude/handoffs/<ISSUE_ID>.md` as part of reflect-and-clear.
+1. Update tracker: status → `In Review`, link PR.
+2. Invoke the `/co-review` skill flow with: PR URL, worktree path, issue ID, mode.
 
-`/kickoff` does not return to the CEO between phase 4 and review. The review chain is automatic in both modes.
+The plan file at `docs/plans/<issue-id>.md` is **retained** post-merge as a historical record (per workflow redesign §11.5). Do not delete it.
 
-## Circuit breakers (autonomous mode pauses and asks CEO)
+`/kickoff` does not return to the user between Phase 4 and review. The review chain is automatic in both modes.
 
-Pause and ask the CEO when:
+## Circuit breakers (autonomous mode pauses and asks user)
+
+Pause and ask the user when:
 
 - Scope ambiguity unresolvable from issue context.
 - About to take a destructive operation outside the standard merge flow.
-- A must-fix finding where CEO acceptance is uncertain.
+- A must-fix finding where user acceptance is uncertain.
 - CI fails repeatedly after one `gh run rerun` retry (likely real, not flake).
 - Implementer returns failure with a truly-blocking reason (corrupt state, unimplementable AC, missing context).
-- Handoff is stale (older than 7 days OR more than 3 commits behind `main`) — warn even in autonomous mode.
+- Plan is stale (older than 7 days OR more than 3 commits behind the default branch) — warn even in autonomous mode.
 
 ## Notes
 
 - One Implementer per issue. Sequential only.
 - Cold respawn for cycle 2 (no `SendMessage`); `/co-review` handles that.
 - Worktree stays alive through merge.
-- The handoff file is gitignored (`.claude/handoffs/` in `.gitignore`). Treat it as session-local state, not source.
-- If the CEO wants to regrill an issue after a stale handoff, delete the handoff file and run `/kickoff <ID>` again — this restarts at phase 1.
+- The plan file is checked in (`docs/plans/<issue-id>.md`). Treat it as a durable artifact, not session-local state.
+- If the user wants to regrill an issue after a stale plan, delete `docs/plans/<issue-id>.md` and run `/kickoff <ID>` again — this restarts at Phase 1.
