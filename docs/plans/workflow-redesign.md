@@ -1,6 +1,6 @@
 # Workflow Redesign Plan: Compose Lifecycle from Skills
 
-**Status:** Draft, mid-grill.
+**Status:** Locked. Grill complete. Ready for Phase 1 implementation.
 **Author:** Orchestrator (with conservative + greenfield agent inputs and user direction).
 **Scope:** This plan describes HOW the project's workflow will be restructured. It does not implement any changes. Implementation gates on grill + user sign-off.
 
@@ -277,30 +277,33 @@ Length target: under 500 lines.
 
 ## 10. Migration phases (each is a separate PR)
 
+Every fork action: copy from `~/.agents/skills/<name>/` → `.claude/skills/<name>/`; restructure to fit our workflow shape; preserve project-agnosticism per §6 (no `Linear` / `AWK-XX` / `pnpm` in skill bodies — reference `AGENTS.md § Skill bindings`).
+
 **Phase 0 (this PR).** Plan only. Gates on grill + user sign-off.
 
-**Phase 1.** Copy primitive skills (project-agnostic):
+**Phase 1 — Fork primitives.** Copy from global, minimal customization (these have no workflow-shape ties):
 - `grill-with-docs`, `diagnose`, `test-driven-development`, `improve-codebase-architecture`.
-- Minimal/no genericization.
 
-**Phase 2.** Copy lifecycle skills with parameterization:
-- `to-prd`, `to-issues`, `triage`. Apply §6 rules.
+**Phase 2 — Fork + customize lifecycle skills.** Heavy customization for our workflow shape:
+- `to-prd` — minor; mostly preserve.
+- `to-issues` — minor; preserve, ensure issues are filed without triage labels.
+- `triage` — heavy: rewrite as a 3-decision sub-procedure (workable / needs-info / wontfix) callable from `/kickoff` Phase 1. Drop the 5-state machine and label-applying logic. Standalone backlog-grooming invocation also supported.
 
-**Phase 3.** Add `arch-review` wrapper skill (cron trigger only, no counter).
+**Phase 3 — Add `arch-review`.** Thin cron-triggered wrapper around `/improve-codebase-architecture`. No counter.
 
-**Phase 4.** Refactor existing local skills + role rename. One PR per skill (3 PRs):
-- `kickoff/SKILL.md` — apply §6, rename CPTO → Orchestrator, fold triage into Phase 1.
+**Phase 4 — Refactor existing local skills + role rename.** One PR per skill:
+- `kickoff/SKILL.md` — apply §6, rename CPTO → Orchestrator, integrate `/triage` as Phase 1 sub-procedure, integrate `/diagnose` dispatch for hard-repro bugs.
 - `co-review/SKILL.md` — apply §6, rename CPTO → Orchestrator.
 - Replace `resume/SKILL.md` with `resume-curator/SKILL.md` and `resume-orchestrator/SKILL.md`.
 
-**Phase 5.** Consolidate plans:
+**Phase 5 — Consolidate plans.**
 - Migrate any existing `.claude/handoffs/*.md` → `docs/plans/`.
 - Update `.gitignore` (drop `.claude/handoffs/`).
 - Update skill references.
 
-**Phase 6.** Rewrite `AGENTS.md`. Write `docs/workflow.md`. Delete `docs/agent/workflow.md`.
+**Phase 6 — Rewrite `AGENTS.md`. Write `docs/workflow.md`. Delete `docs/agent/workflow.md`.**
 
-**Phase 7.** First arch-review dry run. Validate end-to-end.
+**Phase 7 — First `/arch-review` dry run.** Validate end-to-end.
 
 ---
 
@@ -319,23 +322,26 @@ Length target: under 500 lines.
 - **`/arch-review` trigger: cron + user-invoked only.** No counter, no cycle-2 detection automation. `.claude/state/` not created.
 - **Issue-level plan template is slim.** References (`Required reading`) instead of pastes. Locked decisions are the unique content.
 - **Triage stage as a separate lifecycle step is dropped.** `/triage` survives as a callable skill; primary use is inside `/kickoff` Phase 1, secondary is standalone Curator backlog grooming.
+- **All issues triaged before implementation.** `/kickoff` Phase 1 IS the triage step; every issue passes through it.
+- **No triage label vocabulary.** `/kickoff` Phase 1 decisions (workable / needs-info / wontfix) are *transient* — they route Phase 1's next branch, not persistent state to communicate. Linear's native states + assignee + comments cover every prior label use.
+- **`bug` vs `enhancement` is a Linear *category* label** (separate from triage state — labels for triage are dropped, but `bug`/`enhancement` survives because Phase 1 needs the signal to decide whether `/diagnose` runs and whether wontfix writes to `.out-of-scope/`).
+- **Skills are forked into `.claude/skills/` from global and customized for our workflow shape, but remain project-agnostic** via `AGENTS.md § Skill bindings`. Customization changes the *procedure* (e.g., `/triage` becomes a Phase 1 sub-procedure of `/kickoff`); it doesn't bake project-specific terms into skill bodies.
 
 ---
 
-## 12. Open questions (for grill)
+## 12. Defaults applied (no remaining grill questions)
 
-Defaults in italics.
+These were tunable during the grill; locked at default for handover. Override later if real-world signal warrants.
 
-1. **Triage label vocabulary — what survives?** Now that triage isn't a separate stage, the labels (`needs-triage`, `ready-for-agent`, etc.) may be unnecessary. *Default: drop them entirely; rely on Linear states + Linear-native dependency/blocking. `.out-of-scope/` still populates on wontfix.*
-2. **`/diagnose` placement crispness.** Plan §4 says it fires inside `/kickoff` Phase 1 for hard-repro bugs and inside Implementer for fix loops. *Default: yes, those two places only. Curator never invokes `/diagnose` (deferred to Orchestrator's pre-flight).*
-3. **Curator session lifecycle — ephemeral (per-PRD) or persistent?** *Default: ephemeral. Each PRD spins up a Curator session, ends after `/to-issues`. Standalone backlog grooming is a separate brief invocation.*
-4. **Refactor budget — soft (track-only) or hard (next milestone blocks if unmet)?** *Default: soft. Revisit after 3 milestones.*
-5. **Issue-level plans — retain forever post-merge, or prune as cleanup?** *Default: retain.*
-6. **`.out-of-scope/` directory — at repo root or under `docs/`?** *Default: repo root, per global `triage` skill convention.*
-7. **`arch-review` tracker label — does it exist?** *Default: yes, create as part of Phase 3.*
-8. **Phase 4 (refactor existing skills) — single PR or three?** *Default: three.*
-9. **Linear cycles — used as project sprints/iterations or ignored?** *Default: ignore for now; milestones are the unit of grouping.*
-10. **Plans index — does `docs/plans/` get a `README.md`?** *Default: yes, listing active initiative-level plans only.*
+1. **`/diagnose` placement.** Inside `/kickoff` Phase 1 for hard-repro bugs (Orchestrator), and inside the Implementer subagent during the fix loop. Curator never invokes `/diagnose`.
+2. **Curator session lifecycle.** Ephemeral, per-PRD. Each PRD spins up a Curator session, ends after `/to-issues`. Standalone backlog grooming is a separate brief invocation.
+3. **Refactor budget.** Soft — track-only, no milestone block. Revisit after 3 milestones.
+4. **Issue-level plans retention.** Retain forever post-merge.
+5. **`.out-of-scope/` location.** Repo root, per global `triage` skill convention.
+6. **`arch-review` tracker label.** Yes — Linear label, separate from any triage label vocabulary, created in Phase 3.
+7. **Phase 4 split.** Three PRs (one per refactored skill).
+8. **Linear cycles.** Ignore for now; milestones are the unit of grouping. Revisit if cadence pressure builds.
+9. **Plans index.** `docs/plans/README.md` exists, lists initiative-level plans only (issue-level plans are too numerous to index).
 
 ---
 
