@@ -14,7 +14,6 @@ Product requirement documents for Deloop. Each PRD describes _what_ and _why_ fo
 - **One focus per milestone.** Each `mN-` PRD covers one coherent focus area. If scope grows, split into a follow-up milestone (`mN+1`) rather than bundling.
 - **When to write a PRD.** Initiative spans more than ~3 Linear issues, introduces a user-facing concept, or has cross-cutting architectural impact. Below that threshold, the Linear issue description suffices.
 - **Issue linkage.** Each consuming Linear issue references its parent PRD path in the issue description (e.g. `PRD: docs/prd/m2-screens.md`).
-- **Status field.** Draft | Active | Active (in flight) | Shipped | Unscheduled | Archived. Update inline as the initiative moves.
 - **Cross-references to ADRs.** PRDs reference ADRs by name and link only — never restate the ADR's rationale inline. Decision lines should read `**<short name>** — see ADR-NNNN.` ADR rationale stays in the ADR; PRDs describe what + why for the milestone, not why we picked option Y over Z.
 - **PRD scope is an invariant, not a snapshot.** A milestone PRD's Scope and Out-of-scope sections must accurately describe what the milestone delivers throughout its lifecycle. Issue-level granularity (IDs, splits, AC tweaks) lives in Linear; milestone-level shape lives in the PRD. See `docs/agent/workflow.md` for the grill → milestone-assign → decompose → mutate → sync lifecycle.
 
