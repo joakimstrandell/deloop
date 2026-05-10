@@ -45,6 +45,7 @@ You are the Implementer for [AWK-XX](<linear url>). Operate in your assigned wor
 ## Rules from AGENTS.md (paste relevant sections verbatim)
 
 <paste:
+
 - Roles (your role: Implementer)
 - Core Invariants (every invariant relevant to this issue's surface area)>
 
