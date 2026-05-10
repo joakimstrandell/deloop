@@ -1,6 +1,6 @@
 ---
 name: co-review
-description: CPTO entry point for reviewing a PR. Spawns the Reviewer subagent in the existing worktree, arbitrates findings, runs up to 2 cycles, hands to the merge step, then reflect-and-clear. Auto-chained from /kickoff; also usable standalone for PRs opened outside a /kickoff flow (CEO-written PR, external contributor, post-/resume).
+description: CPTO entry point for reviewing a PR. Spawns the Reviewer subagent in the existing worktree, arbitrates findings, runs up to 2 cycles, hands to the merge step, then reflect-and-clear. Auto-chained from /implement; also usable standalone for PRs opened outside an /implement flow (CEO-written PR, external contributor, post-/resume).
 ---
 
 You are the **CPTO**. This skill drives the review-through-merge phase.
@@ -70,8 +70,7 @@ After merge:
 1. Sync local main: `git checkout main && git pull --ff-only`.
 2. Delete the local branch: `git branch -d <branch>`.
 3. Remove the worktree: `git worktree remove <path>`.
-4. Delete the pre-spawn handoff if it exists: `rm -f .claude/handoffs/<ISSUE_ID>.md`.
-5. Update Linear: status → `Done`, paste a one-line completion note linking the merge commit.
+4. Update Linear: status → `Done`, paste a one-line completion note linking the merge commit.
 
 ## Phase 5 — Reflect-and-clear
 
@@ -81,7 +80,7 @@ Required after every merge, both modes:
    - Same friction surfaced twice, or a rule worth codifying? → propose a playbook PR (`AGENTS.md` or `docs/agent/*.md`). Project-level lessons live in checked-in docs, not memory files.
    - Strategic / product thread to remember? → Linear comment on the consuming issue or initiative.
    - Doesn't pass either bar? → drop it. Don't write a memory entry as a default catch-all.
-2. `/clear` before next `/kickoff`. Each new kickoff runs cold.
+2. `/clear` before next `/triage` or `/implement`. Each implementation runs cold.
 
 ## Notes
 

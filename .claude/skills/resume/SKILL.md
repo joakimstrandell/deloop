@@ -1,6 +1,6 @@
 ---
 name: resume
-description: Cold-start recovery for CPTO. Scans Linear, git worktrees, and GitHub PRs to find in-flight issues, classifies their state, and proposes resume actions. Read-only by default. Run on every cold start (new session, post-/clear, post-crash) before accepting new instructions.
+description: Cold-start recovery for CPTO. Scans Linear, git worktrees, and GitHub PRs to find in-flight issues, classifies their state, and proposes resume actions. Read-only by default.
 ---
 
 You are the **CPTO**. This skill reconstructs in-flight state after a session restart, crash, or `/clear`.
@@ -11,23 +11,22 @@ You are the **CPTO**. This skill reconstructs in-flight state after a session re
 
 Run in parallel:
 
-1. **Linear**: list issues with status `In Progress` or `In Review`.
+1. **Linear**: list issues with status `In Progress` or `In Review`. Also list issues labeled `ready-for-agent` (the triage state preceding implementation).
 2. **Git**: list worktrees (`git worktree list`); note which branch each holds and whether it's clean or dirty.
 3. **GitHub**: list open PRs in the repo. For each, capture title, branch, CI status, and the PR comment thread.
-4. **Handoffs**: list files in `.claude/handoffs/` (gitignored). Each `<ISSUE_ID>.md` file is a post-grill, pre-spawn handoff written by `/kickoff` Session A.
 
 ## Phase 2 — Classify each in-flight issue
 
-For each Linear issue from phase 1 (and each handoff from phase 1.4), find the matching worktree and PR. Classify state:
+For each Linear issue from phase 1, find the matching worktree and PR. Classify state:
 
-- **Post-grill, pre-spawn** (handoff present, no worktree, no PR, Linear may still be `Backlog` or `In Progress`): Session A wrote the handoff but the cold spawn never ran. Action: propose `/kickoff <ID>` to read the handoff and spawn the Implementer.
-- **Implementation incomplete** (no PR, dirty worktree): Implementer was mid-task. Cold respawn needed with original prompt + "resume from current worktree state".
+- **Triaged, not yet spawned** (Linear labeled `ready-for-agent`, Agent Brief comment present, no worktree, no PR): triage finished but `/implement` never ran. Action: propose `/implement <ID>`.
+- **Implementation incomplete** (no PR, dirty worktree): Implementer was mid-task. Cold respawn needed with the Agent Brief + "resume from current worktree state".
 - **PR open, no Reviewer findings posted, no `CPTO arbitration:` comments**: cycle 1 review not started. Action: spawn Reviewer.
 - **PR open, `CPTO arbitration:` posted with accepted items, no follow-up commits since**: cycle 2 Implementer pending. Action: cold-respawn Implementer with arbitrated change list.
 - **PR open, follow-up commits since cycle-1 arbitration, no cycle-2 arbitration yet**: cycle 2 review pending. Action: cold-respawn Reviewer.
 - **PR open, cycle-2 arbitration posted, CI green**: ready for merge step. Action: hand to merge phase of `/co-review`.
-- **PR merged but worktree/branch not cleaned**: cleanup only. Also: if a handoff file remains for a merged issue, delete it during cleanup.
-- **Linear says `In Progress`/`In Review` but no matching PR, worktree, or handoff**: orphaned state. Surface to CEO; do not auto-act.
+- **PR merged but worktree/branch not cleaned**: cleanup only.
+- **Linear says `In Progress`/`In Review` but no matching PR or worktree**: orphaned state. Surface to CEO; do not auto-act.
 
 ## Phase 3 — Detect mode (autonomous vs manual)
 
@@ -65,13 +64,13 @@ In manual mode, wait for explicit CEO sign-off per issue.
 
 For each confirmed issue, hand off to the appropriate skill phase:
 
-- Post-grill, pre-spawn → `/kickoff <ID>` (cold CPTO detects the handoff and runs Session B: spawn → review → merge).
-- Implementation incomplete → `/kickoff` phase 4 (Spawn Implementer) with worktree-resume context.
+- Triaged, not yet spawned → `/implement <ID>`.
+- Implementation incomplete → `/implement` phase 2 (Spawn Implementer) with worktree-resume context (pass the existing dirty worktree path; do not create a new one).
 - Cycle 1 review pending → `/co-review` phase 1.
 - Cycle 2 Implementer pending → `/co-review` phase 3 (Implementer leg).
 - Cycle 2 Reviewer pending → `/co-review` phase 3 (Reviewer leg).
 - Merge pending → `/co-review` phase 4.
-- Cleanup only → run worktree/branch cleanup, update Linear to `Done` if PR is merged, delete any leftover handoff for the merged issue.
+- Cleanup only → run worktree/branch cleanup, update Linear to `Done` if PR is merged.
 
 Each resumed issue runs sequentially per the project's no-parallelism rule.
 

@@ -2,20 +2,21 @@
 
 ## Purpose
 
-Default implementation flow for Deloop. Linear is the source of truth for what to build. Procedural orchestration lives in skills (`/kickoff`, `/co-review`, `/resume`); this document captures the rules those skills enforce.
+Default implementation flow for Deloop. Linear is the source of truth for what to build. Procedural orchestration lives in skills (`/triage`, `/implement`, `/co-review`, `/resume`); this document captures the rules those skills enforce.
 
 ## Default Flow
 
-1. Linear issue exists (`AWK-xxx`); scope and AC are explicit.
-2. CPTO runs `/kickoff` (grill, decision gate, spawn Implementer).
-3. Implementer implements scope, runs all checks + tests locally, opens PR with structured description.
-4. `/kickoff` chains into review automatically: CPTO spawns Reviewer in the same worktree.
-5. Reviewer returns structured findings; CPTO arbitrates (accept/reject/defer); arbitrated findings posted on PR.
-6. If changes needed: cold-respawn Implementer → cycle 2 (max). Cold-respawn Reviewer to re-review.
-7. After review converges:
+1. Linear issue exists (`AWK-xxx`).
+2. CPTO runs `/triage <ID>`: grills the issue, posts an Agent Brief comment, transitions Linear state to `ready-for-agent`. CEO `/clear`s.
+3. CPTO runs `/implement <ID>` (cold session): validates the brief, spawns Implementer in a fresh worktree.
+4. Implementer implements scope, runs all checks + tests locally, opens PR with structured description.
+5. `/implement` chains into review automatically: CPTO spawns Reviewer in the same worktree.
+6. Reviewer returns structured findings; CPTO arbitrates (accept/reject/defer); arbitrated findings posted on PR.
+7. If changes needed: cold-respawn Implementer → cycle 2 (max). Cold-respawn Reviewer to re-review.
+8. After review converges:
    - **Manual mode**: pause for CEO co-review of worktree; CEO merges (or asks CPTO to).
    - **Autonomous mode** (CEO opted in for this issue): CPTO verifies CI green, merges.
-8. Reflect-then-clear: write memory entries, propose playbook drift PRs if applicable, update Linear, `/clear`.
+9. Reflect-then-clear: propose playbook drift PRs if applicable, update Linear, `/clear`.
 
 One PR per issue. Split only if the issue is too large to review safely.
 
@@ -65,7 +66,7 @@ The milestone PRD and the Linear milestone are the same scope from two angles. T
 1. **Grill** — sharpen the PRD (Problem, Scope, Decisions). Use `/grill-with-docs` to challenge it against `foundation.md`, `CONTEXT.md`, and existing ADRs. Decisions that pass the ADR bar (hard to reverse, cross-boundary, surprising-without-context) get an ADR; the PRD references it by name only.
 2. **Milestone-assign** — when scope is firm, the `mN-` prefix locks the PRD to Linear milestone N. Both must exist; the PRD's header references the Linear milestone, the Linear milestone references the PRD path.
 3. **Decompose** — break the PRD's Scope into Linear issues (use `/to-issues`). Each issue's description includes `PRD: docs/prd/mN-<slug>.md`. Issues are the workable units; the PRD's Scope sections are the durable shape.
-4. **Mutate during ideation or kickoff** — scope is not frozen at grill time. Issues may be added, split, retitled, or rescoped during ideation, `/kickoff` grilling, or implementation. New issues belong to the milestone; redefined issues stay in the milestone unless they no longer fit.
+4. **Mutate during ideation, triage, or implementation** — scope is not frozen at grill time. Issues may be added, split, retitled, or rescoped during ideation, `/triage` grilling, or implementation. New issues belong to the milestone; redefined issues stay in the milestone unless they no longer fit.
 5. **Sync back to PRD** — when issues are added, removed, or substantially redefined, the PRD's Scope or Out-of-scope sections are updated in the same change. The invariant is at milestone-level grain: the PRD describes _what the milestone delivers_, not every issue ID. Issue splits and AC tweaks inside an existing scope bullet do not require a PRD edit; new scope bullets and dropped scope do.
 
 When the PRD and Linear disagree, neither wins automatically — the disagreement is a smell. CPTO reconciles by editing whichever is wrong.
@@ -77,9 +78,9 @@ Linear issue description is the default planning artifact. Create a plan in `doc
 ## Worktree Lifecycle
 
 - Implementer + Reviewer share one worktree per issue (Git allows only one branch checkout at a time).
-- Created at Implementer kickoff. Persists through review cycles and follow-up commits.
+- Created at Implementer spawn (`/implement`). Persists through review cycles and follow-up commits.
 - Deleted only after merge (or abandonment).
-- Run branch hygiene before kickoff: `git fetch --prune` + delete local branches already merged to `main`.
+- Run branch hygiene before `/implement`: `git fetch --prune` + delete local branches already merged to `main`.
 
 ## Sequential Execution
 

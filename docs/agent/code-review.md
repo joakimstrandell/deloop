@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Issue-aware review process for PRs. Procedural orchestration (spawning Reviewer, cycling, arbitrating, merging) lives in `/co-review` and `/kickoff` skills; this document defines what reviewers must check, what they return, and how CPTO arbitrates.
+Issue-aware review process for PRs. Procedural orchestration (spawning Reviewer, cycling, arbitrating, merging) lives in `/co-review` and `/implement` skills; this document defines what reviewers must check, what they return, and how CPTO arbitrates.
 
 ## Inputs
 
@@ -120,11 +120,11 @@ After cycle 2, all open items are arbitrated to lock scope. No third cycle. In-s
 ## Worktree Model
 
 - Implementer + Reviewer share one worktree per issue.
-- Worktree persists from Implementer kickoff through merge.
+- Worktree persists from Implementer spawn through merge.
 - Review context survives via PR comments, not via worktree filesystem.
 
 ## PR Comment Conventions
 
 - CPTO arbitration: prefix the comment `CPTO arbitration:`.
-- Autonomous-mode trace: `Mode: autonomous (CEO-authorized)` posted by CPTO after kickoff confirmation. Used by `/resume`.
+- Autonomous-mode trace: `Mode: autonomous (CEO-authorized)` posted by CPTO after `/implement` confirmation. Used by `/resume`.
 - Don't `@`-mention humans by GitHub handle unless the handle was explicitly provided. Refer by role ("Implementer", "Reviewer", "CPTO arbitration").
