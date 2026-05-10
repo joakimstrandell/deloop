@@ -17,7 +17,7 @@ The skill is meant to run cold. Each `/implement` invocation is a fresh session.
 1. **Detect mode.** If the CEO's invocation includes "autonomous", "you have the wheel", or similar explicit phrase, this is autonomous mode. Otherwise manual. Default is manual; if ambiguous, ask.
 2. **Confirm mode once.** If autonomous: respond with one line — "Running AWK-X autonomously. Will merge after review converges. Acknowledged." Then proceed without further per-step confirmation (subject to circuit breakers below).
 3. **Branch hygiene.** Run `git fetch --prune` and delete local branches already merged to `main`.
-4. **Update Linear.** Status → `In Progress`.
+4. **Update Linear.** Lifecycle → `in-progress`.
 
 ## Phase 2 — Spawn Implementer
 
@@ -81,7 +81,7 @@ If mode is autonomous: as soon as the Implementer reports the PR URL, post a one
 
 After the Implementer reports the PR URL:
 
-1. Update Linear: status → `In Review`, link PR.
+1. Update Linear: lifecycle → `in-review`, link PR.
 2. Invoke the `/co-review` skill flow with: PR URL, worktree path, Linear issue ID, mode.
 
 `/implement` does not return to the CEO between phase 2 and review. The review chain is automatic in both modes.

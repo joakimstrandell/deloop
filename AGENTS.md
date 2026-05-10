@@ -30,6 +30,31 @@ When CPO and CTO judgment conflict, surface it explicitly ("as CPO I'd ship X; a
 - `/co-review` — Standalone review entry. CPTO spawns Reviewer in the existing worktree, arbitrates findings, cycles up to 2x, hands to merge step.
 - `/resume` — Cold-start recovery. Read-only by default. Scans Linear/git/GitHub, classifies in-flight issues, proposes resume actions.
 
+## Issue tracker mapping (Linear)
+
+Issues carry two orthogonal state axes. Playbooks and skills reference the canonical names below; this section is the only place that names the Linear-specific strings. If the Linear strings change, update the tables here and nowhere else.
+
+**Triage states** — pre-implementation; describe the issue's readiness. Implemented as Linear **labels**.
+
+| Canonical         | Linear mechanism | Linear string     |
+| ----------------- | ---------------- | ----------------- |
+| `needs-triage`    | label            | `needs-triage`    |
+| `needs-info`      | label            | `needs-info`      |
+| `ready-for-agent` | label            | `ready-for-agent` |
+| `ready-for-human` | label            | `ready-for-human` |
+| `wontfix`         | label            | `wontfix`         |
+
+**Lifecycle states** — implementation flow; describe where the work is. Implemented as the Linear **status field**.
+
+| Canonical     | Linear mechanism | Linear string |
+| ------------- | ---------------- | ------------- |
+| `backlog`     | status field     | `Backlog`     |
+| `in-progress` | status field     | `In Progress` |
+| `in-review`   | status field     | `In Review`   |
+| `done`        | status field     | `Done`        |
+
+The two axes are orthogonal: a `ready-for-agent` issue can sit at `backlog` until `/implement` starts work, and an issue keeps its category and triage label after lifecycle changes.
+
 ## Detailed Instructions
 
 PRDs live in `docs/prd/`. Vision: `docs/prd/foundation.md`. Milestone PRDs: `docs/prd/mN-<slug>.md` (one focus per milestone, mapped 1:1 to a Linear milestone). Unscheduled initiatives: `docs/prd/<slug>.md` (no `mN-` prefix). Index: `docs/prd/README.md`.

@@ -70,7 +70,7 @@ After merge:
 1. Sync local main: `git checkout main && git pull --ff-only`.
 2. Delete the local branch: `git branch -d <branch>`.
 3. Remove the worktree: `git worktree remove <path>`.
-4. Update Linear: status → `Done`, paste a one-line completion note linking the merge commit.
+4. Update Linear: lifecycle → `done`, paste a one-line completion note linking the merge commit.
 
 ## Phase 5 — Reflect-and-clear
 
