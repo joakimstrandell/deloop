@@ -8,17 +8,6 @@ Product requirement documents for Deloop. Each PRD describes _what_ and _why_ fo
 - **`mN-<slug>.md`** — milestone-aligned PRDs. One focus per milestone, one PRD per milestone, mapped 1:1 to a Linear milestone. Numbered in the planned execution order.
 - **`<slug>.md`** (no prefix) — initiatives that exist as a defined scope but are not currently scheduled to a milestone.
 
-## Active
-
-| File                                               | Status             | Scope                                                                 |
-| -------------------------------------------------- | ------------------ | --------------------------------------------------------------------- |
-| [foundation.md](foundation.md)                     | Active             | Vision, positioning, mode taxonomy, language.                         |
-| [m0-spatial-canvas.md](m0-spatial-canvas.md)       | Active (in flight) | Discovery, canvas, drag-drop, pseudo-states, Pages, HMR, persistence. |
-| [m1-component-preview.md](m1-component-preview.md) | Draft              | Mode-switcher chassis + per-component variant/state grid.             |
-| [m2-screens.md](m2-screens.md)                     | Draft              | Design-in-code mode with Tailwind-first inspector and write-back.     |
-| [m3-tokens-and-themes.md](m3-tokens-and-themes.md) | Draft              | DTCG tokens, live editing, themes, build outputs.                     |
-| [app-views.md](app-views.md)                       | Unscheduled        | Embedded running apps with token / theme injection.                   |
-
 ## Conventions
 
 - **Naming.** `mN-<slug>.md` for milestone PRDs (e.g. `m2-screens.md`); bare `<slug>.md` for unscheduled initiatives. The `mN-` prefix maps to the Linear milestone of the same number.
@@ -34,27 +23,17 @@ Product requirement documents for Deloop. Each PRD describes _what_ and _why_ fo
 ```md
 # <Title>
 
-Status: Draft | Active | Shipped | Unscheduled | Archived
-Created: YYYY-MM-DD
-Updated: YYYY-MM-DD
-Linear: <milestone or initiative link, if any>
-Depends on: <prior milestones or PRDs, if any>
+## Problem Statement
 
-## Problem
+## Solution
 
-## Goals
+## User Stories
 
-## Non-goals
+## Implementation Decisions
 
-## Scope
+## Testing Decisions
 
-## Success criteria
+## Out of Scope
 
-## Open questions
-
-## Decisions
-
-## Out of scope (this milestone)
-
-## Linked ADRs / Plans
+## Further Notes
 ```

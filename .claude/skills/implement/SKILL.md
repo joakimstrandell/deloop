@@ -11,9 +11,6 @@ The skill is meant to run cold. Each `/implement` invocation is a fresh session.
 
 1. Fetch the Linear issue + its comments.
 2. Confirm an Agent Brief exists. The brief is the Linear comment with the `## Agent Brief` heading (and the AI-generated disclaimer) posted by `/triage` when the issue moved to `ready-for-agent`. If absent: stop and tell the CEO to run `/triage <ID>` first.
-3. **Brief freshness check.** Compute calendar age of the brief comment and the number of commits on `main` since its timestamp.
-   - Stale = older than 7 days **or** more than 3 commits behind `main`.
-   - If stale: warn the CEO ("brief is N days old / M commits behind main; proceed, regrill via `/triage`, or abort?"). In autonomous mode this is a circuit breaker — still ask.
 
 ## Phase 1 — Mode + pre-spawn
 
@@ -64,8 +61,7 @@ You are the Implementer for [AWK-XX](<linear url>). Operate in your assigned wor
 
 ## Required local validation before opening PR
 
-- All `pnpm check` passes (every package).
-- All `pnpm test` passes (unit + relevant E2E).
+- All required local checks pass (see `docs/agent/testing.md`).
 - Conventional Commits format with `(AWK-XX)` suffix.
 
 ## Done criteria
@@ -98,7 +94,6 @@ Pause and ask the CEO when:
 - A must-fix finding where CEO acceptance is uncertain.
 - CI fails repeatedly after one `gh run rerun` retry (likely real, not flake).
 - Implementer returns failure with a truly-blocking reason (corrupt state, unimplementable AC, missing context).
-- Brief is stale (older than 7 days or more than 3 commits behind `main`) — warn even in autonomous mode.
 
 ## Notes
 

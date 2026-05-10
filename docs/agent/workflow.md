@@ -31,7 +31,7 @@ Trivial unblocking infra fixes (CI config, dependency-pin updates, docs-only edi
 
 ## Branch and PR Naming
 
-- Branch: `<type>/awk-<n>-<topic>` (types: `feat`, `fix`, `refactor`, `docs`, `test`, `task`).
+- Branch: `<type>/awk-<n>-<topic>` (types: `feat`, `fix`, `refactor`, `docs`, `test`, `task`, `chore`).
 - PR title: `feat(scope): short intent (AWK-XX)` (or matching type).
 - PR description follows the structured contract (AC mapping, decisions, test evidence, risks).
 - PR description must mention and link the Linear issue. Linear issue must include the PR URL.

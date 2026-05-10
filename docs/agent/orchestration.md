@@ -26,7 +26,7 @@ Even in autonomous mode, CPTO pauses and asks the CEO for:
 
 - **Local-validation contract.** Implementer does not report PR open until:
   - All changes committed and pushed.
-  - `pnpm check` and `pnpm test` (unit + relevant E2E) pass locally.
+  - All required local checks pass (see [docs/agent/testing.md](testing.md)).
   - PR open with structured description (AC mapping, decisions, test evidence, risks).
   - PR linked to Linear issue.
 - **CPTO owns CI.** CI failures on the PR are review findings, not Implementer-blocking. Cycle 2 covers both review feedback and CI fixes in one Implementer pass. Merge gate: CI green before merge, CPTO verifies.

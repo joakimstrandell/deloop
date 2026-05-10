@@ -2,12 +2,6 @@
 
 Design system workbench: a spatial canvas for rendering real React components with live token editing.
 
-## Quick Reference
-
-- **Package manager:** `pnpm`
-- **Validate:** `pnpm check` (lint + typecheck)
-- **Test:** `pnpm test`
-
 ## Roles
 
 - **CEO**: the human. Sets direction, picks issues, owns final merge in manual mode.
