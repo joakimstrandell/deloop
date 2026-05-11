@@ -16,7 +16,7 @@ Product requirement documents for Deloop. Each PRD describes _what_ and _why_ fo
 - **Issue linkage.** Each consuming Linear issue references its parent PRD path in the issue description (e.g. `PRD: docs/prd/m2-screens.md`).
 - **Status field.** `Draft` | `Active` | `Shipped` | `Archived`. Update inline as the initiative moves. `Draft` needs `/grill-with-docs` to sharpen; `Active` is grilled and ready for execution (filename signals scheduled `mN-` vs unscheduled); `Shipped` and `Archived` are terminal. "In flight" is read from the Linear milestone, not here.
 - **Cross-references to ADRs.** PRDs reference ADRs by name and link only — never restate the ADR's rationale inline. Decision lines should read `**<short name>** — see ADR-NNNN.` ADR rationale stays in the ADR; PRDs describe what + why for the milestone, not why we picked option Y over Z.
-- **PRD scope is an invariant, not a snapshot.** A milestone PRD's Scope and Out-of-scope sections must accurately describe what the milestone delivers throughout its lifecycle. Issue-level granularity (IDs, splits, AC tweaks) lives in Linear; milestone-level shape lives in the PRD. See `docs/agent/workflow.md` for the grill → milestone-assign → decompose → mutate → sync lifecycle.
+- **PRD scope is an invariant, not a snapshot.** A milestone PRD's User Stories and Implementation Decisions describe what the milestone delivers; Out of Scope describes what it does not. Both must stay accurate throughout the milestone's lifecycle. Issue-level granularity (IDs, splits, AC tweaks) lives in Linear; milestone-level shape lives in the PRD. See `docs/agent/workflow.md` for the grill → milestone-assign → decompose → mutate → sync lifecycle.
 
 ## Template
 

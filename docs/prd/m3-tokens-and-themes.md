@@ -1,12 +1,8 @@
 # M3 — Tokens and Themes
 
 Status: Draft
-Created: 2026-05-06
-Updated: 2026-05-06
-Linear: M3 Tokens & Themes (to be created)
-Depends on: M0 Spatial Canvas
 
-## Problem
+## Problem Statement
 
 Foundation argues that the canvas without token editing is a spatial Storybook — useful, but missing the value that makes Deloop Deloop. The core feedback loop the product exists to deliver is:
 
@@ -16,103 +12,58 @@ M0 ships the spatial canvas; M1 and M2 deepen the experience around it. M3 close
 
 This is also the most architecturally heavy milestone. Token formats are a multi-tool ecosystem (DTCG, Tailwind config, CSS custom properties, SCSS variables, Tokens Studio). Theme semantics interact with the canvas iframe's CSS injection model. The build step is a real piece of build tooling, not a UI surface. Land this carefully, after M0 / M1 / M2 have validated the canvas surface.
 
-## Goals
+## Solution
 
-- Own the design-token layer at `.deloop/tokens.json` in DTCG (W3C) format.
-- Provide live in-UI token editing — color picker, spacing slider, typography selector — that updates the canvas via CSS variable injection with no reload.
-- Support multiple themes (light, dark, brand variants) as named overrides within the same DTCG structure; switch globally or per Card.
-- Build step transforming DTCG → CSS custom properties (default), with Tailwind config and SCSS as configurable additional outputs, written to `.deloop/dist/`.
-- Support importing existing tokens from non-DTCG formats on first run (CSS custom properties, Tailwind config, Tokens Studio JSON).
+Deloop owns `.deloop/tokens.json` in DTCG v1 format as the canonical source of truth. A live token editor renders per-type controls (colour picker, spacing slider, typography selector, radius input, shadow editor); editing a value injects an updated CSS custom property directly into the canvas iframe's `:root`, updating every dependent Card simultaneously without reload. Themes are named overrides within the same DTCG structure — switching themes globally or per Card uses the same CSS variable injection path. A build step transforms DTCG JSON into `.deloop/dist/tokens.css` on every change (default); Tailwind config and SCSS variables are opt-in additional outputs via `.deloop/config.ts`. On first run with no token file, Deloop scaffolds a minimal DTCG structure and offers a one-time import from detected sources (Tailwind config, CSS custom properties, Tokens Studio JSON).
 
-## Non-goals
+A user with no `.deloop/tokens.json` boots Deloop and gets a working scaffold. Editing a colour value in the token panel updates every Card that uses that colour, instantly. Switching the global theme from `light` to `dark` flips every Card's theme tokens on the same tick. A Card configured with a per-Card theme override renders independently from the global theme. After a token edit, `.deloop/dist/tokens.css` is updated on disk; configuring `outputs: ["css", "tailwind"]` produces both `tokens.css` and `tailwind.tokens.js` on every token edit. Importing from an existing Tailwind config produces a DTCG file the user can immediately edit.
 
-- Not a token-management product on its own — this milestone exists in service of the canvas feedback loop, not as a standalone replacement for Tokens Studio or Style Dictionary.
-- Not the Tailwind-only product call. M2's inspector is Tailwind-first; M3 may produce Tailwind config as one output among several. Whether Deloop's broader product positioning is Tailwind-only is decided after M3 ships and adopter feedback lands.
-- Not collaborative / multi-user token editing. Tokens live on disk; conflicts are Git's job.
-- Not visual regression on token changes (a future, post-M3 capability).
-- Not Figma sync or external-tool round-tripping in M3.
+## User Stories
 
-## Scope
+- As a developer, I want to boot Deloop in a project with no `.deloop/tokens.json` and get a working scaffold, so that I can start editing tokens immediately.
+- As a developer, I want to edit a colour value in the token panel and see every dependent Card update instantly, so that the canvas-token feedback loop is the design loop.
+- As a developer, I want per-type controls (colour picker, spacing slider + numeric input, font selector + size / weight / leading inputs, radius numeric input, composite shadow editor), so that I edit each token at the level I usually think in.
+- As a developer, I want to switch the global theme from `light` to `dark` and see every Card flip on the same tick, so that I can evaluate the system under either theme without reload.
+- As a developer, I want a per-Card theme override (Card-level), so that I can render the same component side-by-side under multiple themes for comparison.
+- As a developer, I want `.deloop/dist/tokens.css` regenerated on every token edit, so that my consuming app's build pipeline always sees fresh values.
+- As a developer, I want `outputs: ["css", "tailwind"]` in `.deloop/config.ts` to also produce `tailwind.tokens.js` (v3) or a v4 CSS `@theme` block, so that my Tailwind project can pick up the same values without manual sync.
+- As a developer, I want `outputs: ["css", "scss"]` to also emit `tokens.scss`, so that SCSS-based pipelines can consume the same source.
+- As a developer, I want a one-time import from an existing Tailwind config / CSS custom properties / Tokens Studio JSON on first run, so that I can adopt Deloop without rewriting my tokens by hand.
+- As a developer, I want common context providers (`@tanstack/react-query` → `QueryClientProvider`, `react-router` → `MemoryRouter`) auto-detected from `package.json` and offered as canvas wrappers, so that the canvas matches my app's runtime without per-shim provider boilerplate.
 
-### Token file
+## Implementation Decisions
 
-`.deloop/tokens.json` is the canonical source of truth, in DTCG v1 format. On first run with no token file, Deloop scaffolds a minimal DTCG structure. The CLI ensures the file exists and reads it on every boot.
+- **DTCG v1 at `.deloop/tokens.json` is the canonical source of truth.** Other formats are build outputs, not source. The CLI ensures the file exists and reads it on every boot. On first run with no token file, Deloop scaffolds a minimal DTCG structure.
+- **Themes are token overrides within the same DTCG structure**, not separate files. A `light` theme and a `dark` theme share the same token keys but provide different values.
+- **CSS custom properties is the default build output** (`dist/tokens.css`). Other outputs (Tailwind config `dist/tailwind.tokens.js`, SCSS variables `dist/tokens.scss`) are opt-in via `.deloop/config.ts`. The build is incremental and runs on token edit; consumers reference `dist/` outputs in their app build pipelines.
+- **Theme switching uses the CSS variable injection path** used by individual token edits — instant, no reload, layered on top of the canvas iframe's existing style entry.
+- **Tailwind output adapts to project version.** v4 emits a CSS `@theme` block; v3 emits a JS config mergeable into `tailwind.config.*`. Detected from `package.json`.
+- **One-time import.** On first run with no `tokens.json` but recognisable token sources elsewhere in the project (Tailwind config, CSS custom properties at the top of a stylesheet, a Tokens Studio JSON), Deloop offers to scaffold the DTCG file from the detected source. Best-effort, one-time, user-reviewable; subsequent edits flow through the DTCG file.
+- **Provider auto-detection** (related). Common context providers are auto-detected from `package.json` and offered as canvas wrappers. The `.deloop/config.ts` wrapper component remains the escape hatch for custom cases. Bundled here because it lands the broader "make the canvas feel like the user's app" deeper.
 
-### Live token editor
+## Testing Decisions
 
-A dedicated panel (likely the right sidebar in a Tokens-mode-extension or a standing panel) renders one control per token, grouped by token type:
+- **Unit** — DTCG parser, token → CSS variable transformer, Tailwind v3/v4 emitter selection, import-source detection.
+- **Integration** — token edit → CSS variable injection → canvas iframe update; build-step incremental output to `.deloop/dist/`; conflict handling between in-editor and in-UI token edits.
+- **E2E** — first-run scaffold, edit → instant ripple across Cards, global and per-Card theme override, `outputs: ["css", "tailwind"]` producing both files, import from Tailwind config.
 
-- color → color picker
-- spacing → slider + numeric input
-- typography → font selector + size / weight / leading inputs
-- radius → numeric input
-- shadow → composite editor
+See [docs/agent/testing.md](../agent/testing.md).
 
-Editing a value injects an updated CSS custom property directly into the canvas iframe's `:root`. All Cards rendering tokens that depend on the changed value update simultaneously. No save, no reload — the file write and CSS injection are the same action.
+## Out of Scope
 
-### Themes
-
-Themes are named sets of token overrides within the same DTCG structure. A `light` theme and a `dark` theme share the same token keys but provide different values. Theme switching uses the same CSS variable injection path as individual token edits — instant, no reload.
-
-The canvas can apply a theme:
-
-- **Globally** — all Cards render under the selected theme (top-bar control).
-- **Per Card** — the same component rendered under multiple themes side-by-side (Card-level theme override, useful for Pages mode multi-theme layouts).
-
-### Token build step
-
-Deloop transforms DTCG JSON into one or more output formats and writes them to `.deloop/dist/`. The default is CSS custom properties, regenerated on every token change. Additional formats are opt-in via `.deloop/config.ts`:
-
-- CSS custom properties (default) — `dist/tokens.css`
-- Tailwind config — `dist/tailwind.tokens.js` (mergeable into the project's `tailwind.config.*`) or v4 CSS `@theme` block
-- SCSS variables — `dist/tokens.scss`
-
-The build is incremental and runs on token edit; consumers reference `dist/` outputs in their app build pipelines.
-
-### Token import (one-time)
-
-On first run with no `tokens.json` but recognisable token sources elsewhere in the project (Tailwind config, CSS custom properties at the top of a stylesheet, a Tokens Studio JSON), Deloop offers to scaffold the DTCG file from the detected source. Best-effort, one-time, the user reviews the result. Subsequent edits flow through the DTCG file.
-
-### Provider auto-detection (related)
-
-Common context providers (`@tanstack/react-query` → `QueryClientProvider`, `react-router` → `MemoryRouter`) are auto-detected from `package.json` and offered as canvas wrappers. The `.deloop/config.ts` wrapper component remains the escape hatch for custom cases. Bundled here because it lands the broader "make the canvas feel like the user's app" deeper.
-
-## Success criteria
-
-- A user with no `.deloop/tokens.json` boots Deloop and gets a working tokens scaffold.
-- Editing a color value in the token panel updates every Card that uses that color, instantly, with no reload.
-- Switching the global theme from `light` to `dark` flips every Card's theme tokens on the same tick.
-- A Card configured with a per-Card theme override renders independently from the global theme.
-- After a token edit, `.deloop/dist/tokens.css` is updated on disk.
-- Configuring `outputs: ["css", "tailwind"]` produces both `tokens.css` and `tailwind.tokens.js` on every token edit.
-- Importing from an existing Tailwind config produces a DTCG file the user can immediately edit.
-
-## Open questions
-
-- **Mode integration.** Does Tokens / Themes get its own mode in the M1 chassis, or live as a panel reachable from any mode? The canvas-wide value of token edits argues for a panel that's available alongside whatever mode is active, not a dedicated Tokens mode. Decide during M3 design.
-- **Tailwind v3 vs v4.** Tailwind v4 changes the config story significantly (CSS-defined `@theme` blocks). The build step needs explicit handling for both. Likely emits v4-style CSS for v4 projects and v3-style JS for v3 projects, detected from `package.json`.
-- **DTCG superset.** The W3C DTCG v1 spec is stable but lean. Some Deloop concerns (theme overrides, semantic / primitive token distinction, token aliases across themes) may need a clearly-namespaced superset. Land minimal DTCG; extend as gaps emerge.
-- **Token file ownership and editor concurrency.** If the user edits `tokens.json` in their editor while Deloop has it open, the same write-back contention as Screens applies. Use the same mtime / version-detection pattern from M2.
-- **Tailwind-only product call.** This milestone is the natural moment to revisit the question. By the time M3 ships, M2 inspector behavior, M0 / M1 / M2 adopter feedback, and the build-step adopter pool will all inform a clearer answer.
-
-## Decisions
-
-(To be filled during M3 design. Anchored decisions:)
-
-- **2026-05-06** — Tokens are stored in `.deloop/tokens.json` in DTCG v1 format. Other formats are build outputs, not source.
-- **2026-05-06** — Themes are token overrides within the same DTCG structure, not separate files.
-- **2026-05-06** — CSS custom properties is the default build output. Other outputs are opt-in via `.deloop/config.ts`.
-
-## Out of scope (M3)
-
+- Token-management product on its own — this milestone exists in service of the canvas feedback loop, not as a standalone replacement for Tokens Studio or Style Dictionary.
+- Tailwind-only product call. M2's inspector is Tailwind-first; M3 may produce Tailwind config as one output among several. Whether Deloop's broader product positioning is Tailwind-only is decided after M3 ships and adopter feedback lands.
+- Collaborative / multi-user token editing. Tokens live on disk; conflicts are Git's job.
 - Visual regression testing on token changes (post-M3).
 - Multi-format token export beyond CSS / Tailwind / SCSS in V1.
 - Cross-project / cross-team token sharing or sync.
 - Round-tripping token edits to external tools (Figma, Tokens Studio).
 - Programmatic / API-driven token editing (file edits and the UI are the only paths).
 
-## Linked ADRs / Plans
+## Further Notes
 
-- `docs/prd/foundation.md` — vision; tokens are framed as the core differentiator.
-- `docs/prd/m0-spatial-canvas.md` — the canvas this milestone closes the loop on.
-- `docs/prd/m2-screens.md` — Tailwind-first inspector; coordinates with this milestone's Tailwind config output.
+- **Mode integration.** Does Tokens / Themes get its own mode in the M1 chassis, or live as a panel reachable from any mode? The canvas-wide value of token edits argues for a panel that's available alongside whatever mode is active, not a dedicated Tokens mode. Decide during M3 design.
+- **Tailwind v3 vs v4 robustness.** Tailwind v4 changes the config story significantly (CSS-defined `@theme` blocks). The build step needs explicit handling for both — supported versions and adapter behaviour need design.
+- **DTCG superset.** The W3C DTCG v1 spec is stable but lean. Some Deloop concerns (theme overrides, semantic / primitive token distinction, token aliases across themes) may need a clearly-namespaced superset. Land minimal DTCG; extend as gaps emerge.
+- **Token file ownership and editor concurrency.** If the user edits `tokens.json` in their editor while Deloop has it open, the same write-back contention as Screens applies. Use the same mtime / version-detection pattern from M2.
+- **Tailwind-only product call revisited.** This milestone is the natural moment to revisit the question. By the time M3 ships, M2 inspector behavior, M0 / M1 / M2 adopter feedback, and the build-step adopter pool will all inform a clearer answer.
