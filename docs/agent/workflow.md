@@ -97,5 +97,5 @@ One issue in flight at a time per CPTO. No parallel Implementers. If parallelism
 ## Recovery
 
 - On every cold start (new session, post-`/clear`, post-crash), CPTO runs `/resume` before accepting new instructions.
-- `/resume` is read-only by default: scans the issue tracker, git worktrees, and GitHub PRs; classifies in-flight issues; proposes actions.
+- `/resume` is read-only by default: scans the issue tracker (via the issue tracker handler subagent), git worktrees, and GitHub PRs; classifies in-flight issues; proposes actions.
 - Source of truth for recovery: issue tracker state + git worktree state + GitHub PR thread (`CPTO arbitration:` history, `Mode: autonomous` trace).

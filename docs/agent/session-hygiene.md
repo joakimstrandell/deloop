@@ -29,6 +29,8 @@ Never a personal memory file. If neither bar is met, drop it.
 
 If the main session crosses ~150k tokens before a natural reflect-and-clear point, finish the current cycle, then reflect-and-clear. Do not interrupt mid-cycle.
 
+Route issue tracker MCP calls through the issue tracker handler subagent. Tracker responses are verbose; keep them out of CPTO's context.
+
 ## Playbook Drift
 
 If the same friction surfaces twice across sessions, propose a playbook update before picking up the next issue (docs-only path in [workflow.md](workflow.md)).

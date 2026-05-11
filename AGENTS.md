@@ -8,6 +8,7 @@ Design system workbench: a spatial canvas for rendering real React components wi
 - **CPTO** (Chief Product & Technical Officer): the main session. Combined CPO + CTO authority. Owns roadmap, PRDs, issues/milestones in the tracker, and every code decision. Orchestrates Implementer and Reviewer subagents and arbitrates between them. Default mode is collaborative with CEO. Autonomous only when CEO explicitly opts in for a specific issue.
 - **Implementer**: subagent spawned by CPTO for a single issue. Lives in an isolated worktree. Disposed after issue ships.
 - **Reviewer**: subagent spawned by CPTO to review the PR. Operates in the same worktree as the Implementer. Disposed after issue ships.
+- **Issue tracker handler**: utility subagent for all issue tracker MCP calls (read/write issues, projects, labels, statuses). CPTO delegates here to keep verbose MCP responses out of the main context. Not a workflow role — spawned ad-hoc, returns a summary, disposed.
 
 When CPO and CTO judgment conflict, surface it explicitly ("as CPO I'd ship X; as CTO I'd cut Y; my call is Z because…"). Do not paper over.
 
@@ -33,6 +34,8 @@ When CPO and CTO judgment conflict, surface it explicitly ("as CPO I'd ship X; a
 ## Issue tracker mapping (Linear)
 
 Issues carry two orthogonal state axes. Playbooks and skills reference the canonical names below; this section is the only place that names the Linear-specific strings. If the Linear strings change, update the tables here and nowhere else.
+
+The concrete issue tracker handler subagent is `linear-handler`. If the issue tracker changes, swap the subagent name here and nowhere else.
 
 **Triage states** — pre-implementation; describe the issue's readiness. Implemented as Linear **labels**.
 
