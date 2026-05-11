@@ -20,10 +20,11 @@ Every comment or issue posted to the issue tracker during triage **must** start 
 
 ## Roles
 
-Two **category** roles:
+Three **category** roles:
 
-- `bug` — something is broken
-- `enhancement` — new feature or improvement
+- `bug` — existing behavior is wrong or broken
+- `feature` — new capability that does not exist today
+- `improvement` — refines or extends existing capability (DX, perf, refactor, polish)
 
 Five **state** roles:
 
@@ -73,7 +74,7 @@ Show counts and a one-line summary per issue. Let the maintainer pick.
    - `ready-for-human` — same structure as an agent brief, but note why it can't be delegated (judgment calls, external access, design decisions, manual testing).
    - `needs-info` — post triage notes (template below).
    - `wontfix` (bug) — polite explanation, then close.
-   - `wontfix` (enhancement) — write to `.out-of-scope/`, link to it from a comment, then close ([OUT-OF-SCOPE.md](OUT-OF-SCOPE.md)).
+   - `wontfix` (feature / improvement) — write to `.out-of-scope/`, link to it from a comment, then close ([OUT-OF-SCOPE.md](OUT-OF-SCOPE.md)).
    - `needs-triage` — apply the role. Optional comment if there's partial progress.
 
 ## Quick state override

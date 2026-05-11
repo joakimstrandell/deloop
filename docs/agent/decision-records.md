@@ -47,6 +47,7 @@ Date: YYYY-MM-DD
 ## Consequences
 
 ## Amendments
+
 <!-- optional; only present when factual corrections have been made -->
 ```
 

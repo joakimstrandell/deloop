@@ -47,6 +47,14 @@ The concrete issue tracker handler subagent is `linear-handler`. If the issue tr
 | `ready-for-human` | label            | `ready-for-human` |
 | `wontfix`         | label            | `wontfix`         |
 
+**Categories** — what kind of work the issue represents. Implemented as Linear **labels**. Every triaged issue carries exactly one.
+
+| Canonical     | Linear mechanism | Linear string | Meaning                                                              |
+| ------------- | ---------------- | ------------- | -------------------------------------------------------------------- |
+| `bug`         | label            | `Bug`         | Existing behavior is wrong or broken.                                |
+| `feature`     | label            | `Feature`     | New capability that does not exist today.                            |
+| `improvement` | label            | `Improvement` | Refines or extends existing capability (DX, perf, refactor, polish). |
+
 **Lifecycle states** — implementation flow; describe where the work is. Implemented as the Linear **status field**.
 
 | Canonical     | Linear mechanism | Linear string |
@@ -56,7 +64,7 @@ The concrete issue tracker handler subagent is `linear-handler`. If the issue tr
 | `in-review`   | status field     | `In Review`   |
 | `done`        | status field     | `Done`        |
 
-The two axes are orthogonal: a `ready-for-agent` issue can sit at `backlog` until `/implement` starts work, and an issue keeps its category and triage label after lifecycle changes.
+The three axes are orthogonal: a `ready-for-agent` issue can sit at `backlog` until `/implement` starts work, and an issue keeps its category and triage label after lifecycle changes.
 
 ## Detailed Instructions
 
