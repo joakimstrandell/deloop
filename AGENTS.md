@@ -57,7 +57,7 @@ The two axes are orthogonal: a `ready-for-agent` issue can sit at `backlog` unti
 
 ## Detailed Instructions
 
-PRDs live in `docs/prd/`. Vision: `docs/prd/foundation.md`. Milestone PRDs: `docs/prd/mN-<slug>.md` (one focus per milestone, mapped 1:1 to a tracker milestone). Unscheduled initiatives: `docs/prd/<slug>.md` (no `mN-` prefix). Index: `docs/prd/README.md`.
+PRDs live in `docs/prd/`. Vision: `docs/prd/foundation.md`. Milestone PRDs: `docs/prd/mN-<slug>.md` (one focus per milestone, mapped 1:1 to a tracker milestone). Unscheduled initiatives: `docs/prd/<slug>.md` (no `mN-` prefix). Policy and template: `docs/agent/prds.md`.
 
 For specific guidelines, see:
 
@@ -67,6 +67,7 @@ For specific guidelines, see:
 - [Testing](docs/agent/testing.md) — testing strategy and required checks
 - [Code Review](docs/agent/code-review.md) — PR review process
 - [Decision Records](docs/agent/decision-records.md) — ADR policy
+- [PRDs](docs/agent/prds.md) — PRD policy, layout, conventions, template
 
 Other documentation:
 

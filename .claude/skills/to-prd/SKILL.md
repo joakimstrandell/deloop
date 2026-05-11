@@ -19,7 +19,7 @@ This skill takes the current conversation context and codebase understanding and
    - **Milestone-bound** (a project milestone numbered N exists or is being created) → `docs/prd/mN-<slug>.md`.
    - **Unscheduled initiative** → `docs/prd/<slug>.md` (no prefix).
 
-   See `docs/prd/README.md` for the full naming convention.
+   See `docs/agent/prds.md` for the full naming convention.
 
 4. **Write the PRD** to that path using the template below. The initial `Status:` line is `Draft`.
 

@@ -55,7 +55,7 @@ Trivial unblocking infra fixes (CI config, dependency-pin updates, docs-only edi
 - `docs/prd/foundation.md`: vision, positioning, mode taxonomy, language. Evolves but doesn't get superseded.
 - `docs/prd/mN-<slug>.md`: milestone-aligned PRDs. One focus per milestone, mapped 1:1 to a milestone in the issue tracker. Numbered in the planned execution order.
 - `docs/prd/<slug>.md` (no prefix): unscheduled initiatives.
-- `docs/prd/README.md`: index of active PRDs and their status.
+- `docs/agent/prds.md`: PRD policy, layout, conventions, and template.
 - Write a PRD when an initiative spans more than ~3 issues, introduces a user-facing concept, or has cross-cutting architectural impact. Below that threshold, the issue description suffices.
 - Each issue references its parent PRD path in the issue description (e.g. `PRD: docs/prd/m2-screens.md`).
 
