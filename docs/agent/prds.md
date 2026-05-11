@@ -2,7 +2,7 @@
 
 ## Purpose
 
-PRDs describe _what_ and _why_ for a coherent product initiative. Plans (`docs/plans/`) describe _how_; ADRs (`docs/adr/`) capture decision rationale.
+PRDs describe _what_ and _why_ for a coherent product initiative. The _how_ lives in the issue itself (description + Agent Brief comment, see [workflow.md](workflow.md#plans-policy)); ADRs (`docs/adr/`) capture decision rationale.
 
 ## When to Write a PRD
 

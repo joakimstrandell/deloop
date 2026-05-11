@@ -74,6 +74,5 @@ Other documentation:
 - `README.md` — project intro for humans
 - `CONTEXT.md` — domain language and glossary (canonical)
 - `docs/adr/` — architectural decisions
-- `docs/plans/` — implementation plans (rare)
 
 Read on-demand when the topic is relevant. Do not preemptively read all files.

@@ -73,7 +73,7 @@ When the PRD and the issue tracker disagree, neither wins automatically — the 
 
 ## Plans Policy
 
-The issue description is the default planning artifact. Create a plan in `docs/plans/` only when work is cross-cutting, high-risk, or architectural and cannot fit in one issue description. PRD = what + why; Plan = how; ADR = decision rationale.
+Plans live in the issue, not in a separate file. The issue description carries scope and acceptance criteria; the Agent Brief comment posted by `/triage` carries the implementation approach. There are no local handoff files (see [session-hygiene.md](session-hygiene.md#triage--implement-split)). PRD = what + why; Plan = how (issue description + Agent Brief); ADR = decision rationale.
 
 ## Worktree Lifecycle
 
