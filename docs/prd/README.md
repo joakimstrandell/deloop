@@ -5,12 +5,12 @@ Product requirement documents for Deloop. Each PRD describes _what_ and _why_ fo
 ## Layout
 
 - **`foundation.md`** — vision, positioning, mode taxonomy, language. Read this first.
-- **`mN-<slug>.md`** — milestone-aligned PRDs. One focus per milestone, one PRD per milestone, mapped 1:1 to a Linear milestone. Numbered in the planned execution order.
+- **`mN-<slug>.md`** — milestone-aligned PRDs. One focus per milestone, one PRD per milestone, mapped 1:1 to a tracker milestone. Numbered in the planned execution order.
 - **`<slug>.md`** (no prefix) — initiatives that exist as a defined scope but are not currently scheduled to a milestone.
 
 ## Conventions
 
-- **Naming.** `mN-<slug>.md` for milestone PRDs (e.g. `m2-screens.md`); bare `<slug>.md` for unscheduled initiatives. The `mN-` prefix maps to the Linear milestone of the same number.
+- **Naming.** `mN-<slug>.md` for milestone PRDs (e.g. `m2-screens.md`); bare `<slug>.md` for unscheduled initiatives. The `mN-` prefix maps to the tracker milestone of the same number.
 - **One focus per milestone.** Each `mN-` PRD covers one coherent focus area. If scope grows, split into a follow-up milestone (`mN+1`) rather than bundling.
 - **When to write a PRD.** Initiative spans more than ~3 Linear issues, introduces a user-facing concept, or has cross-cutting architectural impact. Below that threshold, the Linear issue description suffices.
 - **Issue linkage.** Each consuming Linear issue references its parent PRD path in the issue description (e.g. `PRD: docs/prd/m2-screens.md`).

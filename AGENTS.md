@@ -5,8 +5,8 @@ Design system workbench: a spatial canvas for rendering real React components wi
 ## Roles
 
 - **CEO**: the human. Sets direction, picks issues, owns final merge in manual mode.
-- **CPTO** (Chief Product & Technical Officer): the main session. Combined CPO + CTO authority. Owns roadmap, PRDs, Linear issues/milestones, and every code decision. Orchestrates Implementer and Reviewer subagents and arbitrates between them. Default mode is collaborative with CEO. Autonomous only when CEO explicitly opts in for a specific issue.
-- **Implementer**: subagent spawned by CPTO for a single Linear issue. Lives in an isolated worktree. Disposed after issue ships.
+- **CPTO** (Chief Product & Technical Officer): the main session. Combined CPO + CTO authority. Owns roadmap, PRDs, issues/milestones in the tracker, and every code decision. Orchestrates Implementer and Reviewer subagents and arbitrates between them. Default mode is collaborative with CEO. Autonomous only when CEO explicitly opts in for a specific issue.
+- **Implementer**: subagent spawned by CPTO for a single issue. Lives in an isolated worktree. Disposed after issue ships.
 - **Reviewer**: subagent spawned by CPTO to review the PR. Operates in the same worktree as the Implementer. Disposed after issue ships.
 
 When CPO and CTO judgment conflict, surface it explicitly ("as CPO I'd ship X; as CTO I'd cut Y; my call is Z because…"). Do not paper over.
@@ -25,10 +25,10 @@ When CPO and CTO judgment conflict, surface it explicitly ("as CPO I'd ship X; a
 
 ## Skills (orchestration entry points)
 
-- `/triage` — Move an incoming issue through the triage state machine. Grills, recommends category/state, posts an Agent Brief comment, transitions to `ready-for-agent`. The Agent Brief on the Linear issue is the durable handoff to `/implement`.
+- `/triage` — Move an incoming issue through the triage state machine. Grills, recommends category/state, posts an Agent Brief comment, transitions to `ready-for-agent`. The Agent Brief on the issue is the durable handoff to `/implement`.
 - `/implement` — Spawn the Implementer for a `ready-for-agent` issue, then chain into review. Mode (manual / autonomous) goes on the invocation.
 - `/co-review` — Standalone review entry. CPTO spawns Reviewer in the existing worktree, arbitrates findings, cycles up to 2x, hands to merge step.
-- `/resume` — Cold-start recovery. Read-only by default. Scans Linear/git/GitHub, classifies in-flight issues, proposes resume actions.
+- `/resume` — Cold-start recovery. Read-only by default. Scans the issue tracker, git, and GitHub, classifies in-flight issues, proposes resume actions.
 
 ## Issue tracker mapping (Linear)
 
@@ -57,13 +57,13 @@ The two axes are orthogonal: a `ready-for-agent` issue can sit at `backlog` unti
 
 ## Detailed Instructions
 
-PRDs live in `docs/prd/`. Vision: `docs/prd/foundation.md`. Milestone PRDs: `docs/prd/mN-<slug>.md` (one focus per milestone, mapped 1:1 to a Linear milestone). Unscheduled initiatives: `docs/prd/<slug>.md` (no `mN-` prefix). Index: `docs/prd/README.md`.
+PRDs live in `docs/prd/`. Vision: `docs/prd/foundation.md`. Milestone PRDs: `docs/prd/mN-<slug>.md` (one focus per milestone, mapped 1:1 to a tracker milestone). Unscheduled initiatives: `docs/prd/<slug>.md` (no `mN-` prefix). Index: `docs/prd/README.md`.
 
 For specific guidelines, see:
 
 - [Subagent Orchestration](docs/agent/orchestration.md) — Implementer/Reviewer cycles, arbitration, contracts
 - [Session Hygiene](docs/agent/session-hygiene.md) — triage/implement split, reflect-and-clear, context threshold, playbook drift
-- [Workflow](docs/agent/workflow.md) — Linear flow, branches, PRs, worktree lifecycle, autonomous mode, recovery
+- [Workflow](docs/agent/workflow.md) — tracker flow, branches, PRs, worktree lifecycle, autonomous mode, recovery
 - [Testing](docs/agent/testing.md) — testing strategy and required checks
 - [Code Review](docs/agent/code-review.md) — PR review process
 - [Decision Records](docs/agent/decision-records.md) — ADR policy
