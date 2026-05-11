@@ -88,7 +88,7 @@ A token build step transforms DTCG JSON into output formats consumed by apps (CS
 
 Components are placed on a free, infinite canvas — zoomable, pannable. Multiple components and prop configurations of the same component can be arranged spatially and viewed simultaneously. The canvas is implemented as a full-document iframe (ADR-0001), giving it complete style isolation from the Shell and a faithful reproduction of the component's real runtime environment.
 
-The canvas supports **Pages** (separate named canvases, switchable via tabs). **Frames** (rectangular grouping regions within a Page) are designed for but unscheduled.
+The canvas supports **Pages** (separate named canvases, switched from the left-sidebar Pages list). **Frames** (rectangular grouping regions within a Page) are designed for but unscheduled.
 
 ### Input method is irrelevant
 
