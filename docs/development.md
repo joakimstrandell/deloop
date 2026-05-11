@@ -42,7 +42,7 @@ This repo uses Husky + lint-staged:
 
 - pre-commit runs `pnpm lint-staged`
 - staged JS/TS files are linted with `oxlint --fix` and formatted with `oxfmt`
-- staged JSON files are formatted with `oxfmt`
+- staged JSON and Markdown files are formatted with `oxfmt`
 
 ## Repository layout
 

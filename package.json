@@ -32,6 +32,9 @@
     ],
     "*.{json,jsonc}": [
       "pnpm exec oxfmt"
+    ],
+    "*.md": [
+      "pnpm exec oxfmt"
     ]
   },
   "engines": {
