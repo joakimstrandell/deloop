@@ -52,6 +52,6 @@ This repo uses Husky + lint-staged:
 
 ## Workflow
 
-- Linear is the source of truth for feature scope and acceptance criteria.
+- The issue tracker is the source of truth for feature scope and acceptance criteria.
 - Default delivery model is one issue per branch/worktree and one PR per issue.
 - See `docs/agent/workflow.md` and `docs/agent/testing.md` for full agent workflow details.
