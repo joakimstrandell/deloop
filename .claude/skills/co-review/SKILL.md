@@ -9,7 +9,7 @@ You are the **CPTO**. This skill drives the review-through-merge phase.
 
 - PR URL.
 - Worktree path (where the Implementer ran).
-- Linear issue ID.
+- Issue ID.
 - Mode (manual / autonomous).
 
 If invoked standalone and any of these are unclear, ask before spawning.
@@ -20,7 +20,7 @@ If invoked standalone and any of these are unclear, ask before spawning.
 
 - Worktree path the Reviewer must `cd` into.
 - PR URL.
-- Linear issue: ID, description, AC list (paste).
+- Issue: ID, description, AC list (paste).
 - Brief paste of relevant `AGENTS.md` invariants.
 - Reviewer output contract from `docs/agent/code-review.md` (paste the format).
 - Required checks: `pnpm check`, `pnpm test:unit`, relevant `pnpm test:e2e`.
@@ -31,8 +31,8 @@ If invoked standalone and any of these are unclear, ask before spawning.
 When Reviewer returns findings:
 
 1. Read each finding. Spot-read specific file:line if a finding is unclear; do not re-read the full diff.
-2. For each: **accept** / **reject** / **defer**. Reject only when Reviewer is wrong. Defer means out of scope → file new Linear issue, link in arbitration comment.
-3. Post a single PR review comment prefixed `CPTO arbitration:` with the call on each item. For deferred items, include the new Linear issue link.
+2. For each: **accept** / **reject** / **defer**. Reject only when Reviewer is wrong. Defer means out of scope → file new issue, link in arbitration comment.
+3. Post a single PR review comment prefixed `CPTO arbitration:` with the call on each item. For deferred items, include the new issue link.
 4. If verdict is `ready` and no must-fix items: skip phase 3, go to phase 4.
 
 ## Phase 3 — Cycle 2 (cold respawn)
@@ -47,7 +47,7 @@ Cold-respawn Implementer with:
 
 When Implementer reports follow-up commits, cold-respawn Reviewer with:
 
-- Worktree path, PR URL, Linear issue.
+- Worktree path, PR URL, issue.
 - The cycle-1 arbitrated change list as context.
 - Instruction: re-review focused on the arbitrated items + diff since cycle 1. Flag new issues introduced.
 
@@ -70,7 +70,7 @@ After merge:
 1. Sync local main: `git checkout main && git pull --ff-only`.
 2. Delete the local branch: `git branch -d <branch>`.
 3. Remove the worktree: `git worktree remove <path>`.
-4. Update Linear: lifecycle → `done`, paste a one-line completion note linking the merge commit.
+4. Update the issue: lifecycle → `done`, paste a one-line completion note linking the merge commit.
 
 ## Phase 5 — Reflect-and-clear
 
@@ -78,7 +78,7 @@ Required after every merge, both modes:
 
 1. Reflect (write, don't just chat). For each surprise or pattern, pick the right home:
    - Same friction surfaced twice, or a rule worth codifying? → propose a playbook PR (`AGENTS.md` or `docs/agent/*.md`). Project-level lessons live in checked-in docs, not memory files.
-   - Strategic / product thread to remember? → Linear comment on the consuming issue or initiative.
+   - Strategic / product thread to remember? → Comment on the consuming issue or initiative.
    - Doesn't pass either bar? → drop it. Don't write a memory entry as a default catch-all.
 2. `/clear` before next `/triage` or `/implement`. Each implementation runs cold.
 

@@ -38,7 +38,7 @@ TDD is not required for pure exploratory spikes, but stable interfaces from spik
 
 ## Minimum Test Requirements Per Issue
 
-Each Linear issue should include:
+Each issue should include:
 
 - At least one unit or integration test for each acceptance criterion that is logic-heavy.
 - At least one E2E test for each new user-facing workflow.
@@ -89,7 +89,7 @@ Forbidden test-layer changes:
 - Extending timeouts, raising retries, or marking flaky to mask a real defect.
 - Adding helpers that compensate for a product bug rather than testing around it.
 
-When a test surfaces a bug outside its original scope, file a follow-up Linear issue and fix the bug. Do not absorb the workaround into the test suite. When the product fix lands, any prior test-layer mitigation gets removed in the same PR (or a follow-up linked from it) — keeping the workaround alongside the fix is itself a violation.
+When a test surfaces a bug outside its original scope, file a follow-up issue and fix the bug. Do not absorb the workaround into the test suite. When the product fix lands, any prior test-layer mitigation gets removed in the same PR (or a follow-up linked from it) — keeping the workaround alongside the fix is itself a violation.
 
 ## Definition of Done (Required Checks)
 
@@ -99,6 +99,6 @@ Before marking an issue Done:
 2. `pnpm test:unit` passes.
 3. Relevant integration tests pass.
 4. Relevant `pnpm test:e2e` scenarios pass.
-5. Linear issue links PR and includes test evidence summary.
+5. Issue links PR and includes test evidence summary.
 
-If a check is intentionally deferred, document why in the PR and Linear issue before merge.
+If a check is intentionally deferred, document why in the PR and the issue before merge.

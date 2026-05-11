@@ -28,7 +28,7 @@ Do not create ADRs for:
 - naming or cosmetic refactors,
 - routine library upgrades without architectural impact.
 
-For these, capture rationale in the Linear issue and PR description.
+For these, capture rationale in the issue and PR description.
 
 ## ADR Format
 
@@ -53,10 +53,10 @@ Date: YYYY-MM-DD
 - Mark `Accepted` once the implementation direction is agreed.
 - Never rewrite accepted decision history.
 - If direction changes, create a new ADR that supersedes the old one and update status links.
-- Keep ADR titles architecture-focused; do not include Linear issue IDs in ADR titles.
+- Keep ADR titles architecture-focused; do not include issue IDs in ADR titles.
 
-## Relationship to Linear
+## Relationship to the issue tracker
 
-- Linear is the scope and delivery source of truth.
+- The issue tracker is the scope and delivery source of truth.
 - ADRs capture cross-issue architectural rationale.
-- Link relevant ADR IDs in the Linear issue and PR when architecture changes are involved.
+- Link relevant ADR IDs in the issue and PR when architecture changes are involved.

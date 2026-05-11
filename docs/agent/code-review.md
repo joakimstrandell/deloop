@@ -8,12 +8,12 @@ Issue-aware review process for PRs. Procedural orchestration (spawning Reviewer,
 
 Every review uses:
 
-- The linked Linear issue (`AWK-xxx`) as scope and AC source of truth.
+- The linked issue (`AWK-xxx`) as scope and AC source of truth.
 - `AGENTS.md` invariants.
 - `docs/agent/testing.md` required checks.
 - The full PR diff and the Implementer's structured PR description.
 
-If no Linear issue is linked: verdict is `needs changes` until linkage is fixed.
+If no issue is linked: verdict is `needs changes` until linkage is fixed.
 
 ## Sequence
 
@@ -32,7 +32,7 @@ If no Linear issue is linked: verdict is `needs changes` until linkage is fixed.
 Reviewer's first check. If missing or incomplete, that's a `must-fix`:
 
 ```md
-## Linear issue
+## Issue
 
 AWK-XX: <title>
 
@@ -104,7 +104,7 @@ Arbitration is the load-bearing step. Rubber-stamping Reviewer findings outsourc
 
 - **Accept**: finding is correct; goes to Implementer's change list.
 - **Reject**: Reviewer is wrong (false positive, misread intent, out of project context). Log reason in arbitration comment.
-- **Defer**: valid but out of scope. File new Linear issue, link in arbitration comment, do not expand current PR.
+- **Defer**: valid but out of scope. File new issue, link in arbitration comment, do not expand current PR.
 
 Spot-read specific file:line if a finding's call is unclear. Don't re-read the full diff — that defeats the subagent split.
 
@@ -114,8 +114,8 @@ After cycle 2, all open items are arbitrated to lock scope. No third cycle. In-s
 
 - Don't request out-of-scope work unless required to safely ship the issue.
 - Prefer precise actionable suggestions over broad refactor asks.
-- Substantial new work surfaced during review → recommend new Linear issue, not PR expansion.
-- Out-of-scope findings (deferred) must land in Linear before review is complete: comment on consuming issue if one exists, or new low-priority issue. Reference originating PR for context.
+- Substantial new work surfaced during review → recommend new issue, not PR expansion.
+- Out-of-scope findings (deferred) must land in the issue tracker before review is complete: comment on consuming issue if one exists, or new low-priority issue. Reference originating PR for context.
 
 ## Worktree Model
 
