@@ -36,12 +36,10 @@ In Components mode, clicking `Button` in the sidebar renders a grid with one Car
 - **Mode taxonomy and chassis** — see ADR-0006. M1 ships two segments (Pages, Components). M0 stays single-mode; M2 / unscheduled add segments without rearchitecting.
 - **Right-sidebar tabbed-panel chassis** — see ADR-0009. M1 ships one tab (`Props`) hosting the variant picker, pseudo-state picker, and shared values for non-union props (the existing M0 prop controls, lifted into the tab). M2 adds the `Style` tab. When only one tab is visible in the active mode, the tab strip is hidden — the panel shows that tab's content directly. Per-tab state is preserved across mode switches.
 - **Per-mode state, persisted independently.** Pages mode owns its current Page, zoom/pan, and Card layout (existing `canvas.json` shape extended to nest under a `pages` key). Components mode owns the currently-selected Component entry and the chosen variant/state set. Mode switching preserves both mode states.
-- **Per-mode default tab and visible tab set.** Pages and Components modes show `Props` only. Screens mode (M2) adds and defaults to `Style`; whether `Props` is also visible in Screens defers to AWK-16's nested-prop-editing direction.
+- **Per-mode default tab and visible tab set.** Pages and Components modes show `Props` only. Screens mode (M2) adds and defaults to `Style`; whether `Props` is also visible in Screens — for selecting a nested project-component instance — defers to M2 design.
 - **User picks the variant set; no auto-enumeration.** Avoids combinatorial explosion on components with many union props.
-- **Reuse M0 infrastructure.** Prop inference (M0 / AWK-16) and pseudo-state forcing (M0) carry over unchanged — no new infrastructure for variants.
+- **Reuse M0 infrastructure.** Prop inference and pseudo-state forcing (both M0) carry over unchanged — no new infrastructure for variants.
 - **Sidebar gesture.** In Components mode, the left sidebar is the same Component-entry list as Pages mode, but clicking a component selects it for preview rather than starting a drag.
-
-Shared with M2 via [AWK-16](https://linear.app/awkwardgroup/issue/AWK-16/typescript-prop-inference-and-props-panel): prop inference and panel architecture.
 
 ## Testing Decisions
 
@@ -68,4 +66,4 @@ See [docs/agent/testing.md](../agent/testing.md).
 - **Grid axis defaults.** Variant on rows, state on columns? Or the inverse? Probably configurable, but V1 needs one default.
 - **Components with no variants.** A Button with no `variant` union is just one Card per pseudo-state. A component with no union props _and_ default pseudo-state only is one Card. The mode should still be useful — how does the empty-variant case render?
 - **Multiple union props.** A component with `variant` × `size` × `tone` has 3 axes, not 2. V1 grid is 2D — picks the two axes with the most distinct values? Or the user picks which two? Probably the latter.
-- **Relationship to AWK-16 follow-up.** The Components mode controls today live above the Screens Inspector design. If AWK-16's follow-up makes the props panel selectable per-instance (nested-prop-editing), Components mode and Screens mode share that panel architecture. Decide before either ships in detail.
+- **Nested-prop-editing direction.** If the Props panel becomes selectable per-instance — clicking a project component inside a Screen reveals its props in the `Props` tab — Components mode and Screens mode share that panel architecture, and the `Props` tab becomes visible in Screens. Decide before either mode ships in detail. Also drives ADR-0009's deferred selection-source convention.

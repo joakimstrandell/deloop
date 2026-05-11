@@ -46,7 +46,7 @@ A `*.screen.deloop.tsx` file appears in the Screens list within 1s of being crea
 - **V1 edits in place; no "browse all utilities" picker.** Existing classes are parsed and edited; adding utilities that weren't there before is a V2 ergonomic win.
 - **Component entry gains a `kind` field** (Shim / Screen / future). Discovery filters by kind to populate per-mode sidebars. The same discovery and HMR pipeline used for Shims applies; the kind marker tells the Shell which list and which mode the entry belongs to.
 
-Shared with M1 via [AWK-16](https://linear.app/awkwardgroup/issue/AWK-16/typescript-prop-inference-and-props-panel): the right-sidebar tabbed-panel chassis is locked (ADR-0009); whether the `Props` tab becomes visible in Screens mode for a selected project-component instance depends on AWK-16's nested-prop-editing direction.
+The right-sidebar tabbed-panel chassis is locked (ADR-0009). Whether the `Props` tab is also visible in Screens — for selecting a nested project-component instance — is the remaining open question; decided alongside M1 design (see [m1-component-preview.md](m1-component-preview.md) Further Notes, "Nested-prop-editing direction").
 
 ## Testing Decisions
 
@@ -71,8 +71,7 @@ See [docs/agent/testing.md](../agent/testing.md).
 
 - **Scope of structured controls.** Spacing / colour / typography / layout in V1 is the floor. Where to draw the line on `flex-*`, `grid-*`, `gap-*` (probably in), `animate-*` and `motion-*` (probably out)?
 - **Tailwind config awareness.** Inspector colour swatches should reflect the project's actual palette, not generic Tailwind defaults. Means reading `tailwind.config.*` (v3) or the CSS-defined config (v4). Robustness across Tailwind versions needs design.
-- **Selecting nested project components.** If a Screen renders `<Button variant="primary" />` and the user clicks the Button, do they edit (a) the Button instance's props, or (b) the Tailwind classes on the rendered Button DOM? Likely (a) on click of the component box, (b) on click of inner DOM. Needs UX design.
-- **Relationship to AWK-16.** The right-sidebar tabbed-panel chassis is locked (ADR-0009) — M1 ships the chassis with `Props`, M2 adds `Style`. What remains open: when a Screen renders a project component instance and the user selects it, does the `Props` tab become visible in Screens mode for that selection? AWK-16's nested-prop-editing direction decides this.
+- **Selecting nested project components.** If a Screen renders `<Button variant="primary" />` and the user clicks the Button, do they edit (a) the Button instance's props, or (b) the Tailwind classes on the rendered Button DOM? Likely (a) on click of the component box, (b) on click of inner DOM. Needs UX design. Coupled with the nested-prop-editing direction decision (see [m1-component-preview.md](m1-component-preview.md) Further Notes).
 - **Layout primitives in Screens.** Frames and auto-layout (mirroring Figma) — out of V1 by default; composition lives in code. Revisit if real users hit the wall.
 - **Adding new utilities.** V1 only edits existing classes. Adding a class atom that wasn't there before (e.g. user wants to add `rounded-lg` to a node that has none) is a V2 ergonomic win.
 - **Foundation deltas (stale).** Original PRD flagged a follow-up to: replace "components and compositions are treated identically" with the mode taxonomy, demote App Views to unscheduled, slim `foundation.md` to vision only, and update `README.md` naming to allow the `mN-` prefix. Foundation and README have since been updated; leaving the note for trace.

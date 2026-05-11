@@ -44,7 +44,8 @@ Per-mode default tab and visible tab set:
 - **Components mode:** `Props` only. No `Style` tab.
 - **Screens mode:** `Style` is the default. Whether `Props` is also
   visible in Screens (for selecting a nested project component
-  instance) is deferred to AWK-16's nested-prop-editing direction.
+  instance) is deferred until M1/M2 design picks the
+  nested-prop-editing direction.
 - **Apps mode (unscheduled):** owns its tab set when scheduled.
 
 Per-tab state is preserved across mode switches: leaving Components
@@ -79,7 +80,8 @@ same way.
   tab is visible.
 - Cross-tab state coupling (e.g. selecting a node in Screens mode
   while the Props tab is also open for that same node) needs a
-  selection-source convention. Defer until AWK-16 firms up.
+  selection-source convention. Defer until the nested-prop-editing
+  direction is decided.
 
 ## Rejected alternatives
 
@@ -107,5 +109,3 @@ same way.
 - M1 (Component Preview) PRD — ships the chassis with `Props` as the
   V1 tab.
 - M2 (Screens) PRD — adds the `Style` tab; Inspector is its content.
-- AWK-16 — nested-prop-editing direction informs whether `Props` is
-  visible in Screens mode.
