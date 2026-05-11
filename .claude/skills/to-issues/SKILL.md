@@ -1,19 +1,24 @@
 ---
 name: to-issues
-description: Break a plan, spec, or PRD into independently-grabbable issues on the project issue tracker using tracer-bullet vertical slices. Use when user wants to convert a plan into issues, create implementation tickets, or break down work into issues.
+description: Break a plan, spec, or PRD into independently-grabbable issues on the issue tracker using tracer-bullet vertical slices. Use when user wants to convert a plan into issues, create implementation tickets, or break down work into issues.
 ---
 
 # To Issues
 
 Break a plan into independently-grabbable issues using vertical slices (tracer bullets).
 
-The issue tracker and triage label vocabulary should have been provided to you — run `/setup-matt-pocock-skills` if not.
+This skill stays tracker-agnostic. For tracker name, issue-key format, and the canonical triage-state strings, see [AGENTS.md](../../../AGENTS.md) "Issue tracker mapping" — the only place that names tracker-specific strings.
 
 ## Process
 
 ### 1. Gather context
 
-Work from whatever is already in the conversation context. If the user passes an issue reference (issue number, URL, or path) as an argument, fetch it from the issue tracker and read its full body and comments.
+Work from whatever is already in the conversation context. If the user passes a reference as an argument, fetch its full body:
+
+- **Issue reference** (issue key or URL) → fetch from the issue tracker.
+- **PRD path** (e.g. `docs/prd/mN-<slug>.md` or `docs/prd/<slug>.md`) → read from disk.
+
+If the source is a PRD, record its path — every consuming issue body must reference it (see `docs/agent/workflow.md` "PRDs": each issue references its parent PRD path in the description).
 
 ### 2. Explore the codebase (optional)
 
@@ -49,16 +54,22 @@ Ask the user:
 
 Iterate until the user approves the breakdown.
 
-### 5. Publish the issues to the issue tracker
+### 5. Publish the issues
 
-For each approved slice, publish a new issue to the issue tracker. Use the issue body template below. Apply the `needs-triage` triage label so each issue enters the normal triage flow.
+For each approved slice, publish a new issue to the issue tracker using the body template below. Apply the canonical `needs-triage` triage state so each issue enters the normal triage flow (see AGENTS.md "Issue tracker mapping" for the tracker-specific label this resolves to).
 
-Publish issues in dependency order (blockers first) so you can reference real issue identifiers in the "Blocked by" field.
+Publish in dependency order (blockers first) so you can reference real issue keys in the "Blocked by" field.
+
+This skill does not dictate branch or PR names — those are governed by `docs/agent/workflow.md` "Branch and PR Naming" and applied by the consuming `/implement` flow. Do not embed branch suggestions in the issue body.
 
 <issue-template>
 ## Parent
 
 A reference to the parent issue on the issue tracker (if the source was an existing issue, otherwise omit this section).
+
+## PRD
+
+`PRD: docs/prd/mN-<slug>.md` (or `docs/prd/<slug>.md` for unscheduled initiatives). Include this section whenever the source is a PRD; omit otherwise.
 
 ## What to build
 
